@@ -253,8 +253,12 @@ network policy on it: out to the internet, nothing inward. Defining the VM as a 
 profile (CPU/RAM cap, no host mounts) keeps a server reproducible and fits reusing this setup per
 client.
 
-Anthropic's reference devcontainer and its `init-firewall.sh` are the natural starting point if and
-when default-deny egress is wanted for a particular workload.
+Not used, and worth saying plainly because it comes up: Anthropic's reference devcontainer and its
+`init-firewall.sh`. The agent image here is a plain `debian:bookworm-slim` built from a committed
+Dockerfile, and the network policy is nftables in the VM allowing all outbound and denying only the
+private ranges. `init-firewall.sh` implements the opposite posture — default-deny with an allowlist —
+which is `make-egress-restricted`, deferred. If that recipe ever gets built, the devcontainer's
+allowlist is the obvious thing to seed it from. Until then nothing from it is in play.
 
 ### What this pulls in, and why each one
 
