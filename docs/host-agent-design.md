@@ -254,7 +254,7 @@ profile (CPU/RAM cap, no host mounts) keeps a server reproducible and fits reusi
 client.
 
 Not used, and worth saying plainly because it comes up: Anthropic's reference devcontainer and its
-`init-firewall.sh`. The agent image here is a plain `debian:bookworm-slim` built from a committed
+`init-firewall.sh`. The agent image here is a plain `debian:trixie-slim` built from a committed
 Dockerfile, and the network policy is nftables in the VM allowing all outbound and denying only the
 private ranges. `init-firewall.sh` implements the opposite posture — default-deny with an allowlist —
 which is `make-egress-restricted`, deferred. If that recipe ever gets built, the devcontainer's
@@ -272,7 +272,7 @@ so the list is deliberately short and each entry has to beat the simpler alterna
 | Colima | Homebrew formula, MIT | This *is* the simple option: Docker Desktop is proprietary and licensed, UTM is a GUI pet-VM tool, raw Lima needs a container runtime bolted on |
 | Lima's Ubuntu guest image | Canonical cloud image, via Colima | Colima's default; building our own buys nothing |
 | Claude Code | `claude.ai/install.sh`, first-party | The native installer keeps Node out of the VM and the image entirely; the npm route would drag a runtime in |
-| `debian:bookworm-slim` | Docker Official Image | Alpine is smaller but musl, and the Claude Code binary targets glibc |
+| `debian:trixie-slim` | Docker Official Image | Alpine is smaller but musl, and the Claude Code binary targets glibc |
 | apt packages | Debian and Ubuntu archives | — |
 
 Two deliberate non-dependencies. There is no separate probe image: verify tests container egress
@@ -281,10 +281,17 @@ registry round-trip and a supply-chain entry for something bash already does. An
 client in the agent image: clones are throwaway HTTPS and no key ever enters the VM, so it would be
 surface without a use.
 
-Nothing is pinned by digest. Tracking `bookworm-slim` and current Homebrew formulae means rebuilds
+Nothing is pinned by digest. Tracking `trixie-slim` and current Homebrew formulae means rebuilds
 pick up security updates, which matters more on a long-lived server than byte-identical rebuilds —
 the reproducibility that is load-bearing here is the Colima profile and the recipes, both of which
 are committed.
+
+The cost of that choice is a thing nobody notices until it bites: a codename does not follow Debian
+forward. This project was written against `bookworm-slim`, which went oldstable when trixie shipped
+in August 2025 and left regular security support on 12 July 2026 — so for a while the agent image
+was built on a release that only had LTS coverage. Tracking `stable` instead would have avoided that
+and introduced a worse problem, silently jumping a major release mid-rebuild. Keep the codename,
+and treat "is this still current stable?" as a real maintenance task rather than an assumption.
 
 ### Colima, and when UTM would be the answer instead
 

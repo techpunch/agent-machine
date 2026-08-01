@@ -7,10 +7,17 @@
 # Nothing secret is baked in. Credentials arrive at run time on a named volume, because
 # image layers leak if an image is ever shared.
 # Debian rather than Alpine: the Claude Code native installer targets glibc, and musl is
-# where that goes subtly wrong. Tracking bookworm rather than pinning a digest means the
-# image picks up Debian security updates on rebuild, which matters more here than
-# byte-for-byte reproducibility.
-FROM debian:bookworm-slim
+# where that goes subtly wrong.
+#
+# Track the codename of current stable, not `stable` and not a digest. A digest would pin
+# away security updates; `stable` would silently jump a major release on some future
+# rebuild. A codename gets updates within the release and makes the upgrade a deliberate
+# edit — but it only works if someone makes that edit, so:
+#
+#   trixie is Debian 13, stable since August 2025, full support to August 2028.
+#   Bump this when trixie goes oldstable. Bookworm was left here past its regular support
+#   window (which ended 12 July 2026) precisely because nobody was watching for it.
+FROM debian:trixie-slim
 
 ARG AGENT_UID=1000
 ARG AGENT_GID=1000
