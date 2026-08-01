@@ -78,3 +78,9 @@ or a note on your laptop; not in this repo, and never in the agent VM.
 
 Not built yet: signing Codex in alongside Claude Code, default-deny egress for proprietary work, and
 encryption at rest. Each carries a contract in `recipes/` explaining what it is waiting on.
+
+## License
+
+[MIT](LICENSE). Provided as is, with no warranty of any kind — which is worth reading rather than
+skipping past, given this configures your machine as root, runs agents with permissions skipped, and
+turns off disk encryption. You are responsible for what you run it on.
