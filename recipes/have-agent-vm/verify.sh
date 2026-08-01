@@ -49,6 +49,20 @@ for var in VM_CPUS VM_MEMORY VM_DISK; do
   [ -n "${!var:-}" ] && ok "$var=${!var}" || miss "$var not recorded in server.env"
 done
 
+# Not configuration — an observation, recorded so "which home does the agent see" is
+# answerable without guessing. Compare it rather than trusting the file, since a rebuilt VM
+# can come back as a different user.
+live_home=$(vm_ssh sh -c 'echo $HOME' 2>/dev/null | /usr/bin/tr -d '\r' || true)
+if [ -z "$live_home" ]; then
+  miss "could not read the guest's home directory"
+elif [ -z "${VM_HOME:-}" ]; then
+  miss "guest home is $live_home but VM_HOME is not recorded — run apply"
+elif [ "$live_home" != "$VM_HOME" ]; then
+  miss "guest home is $live_home but server.env says $VM_HOME — run apply to re-record"
+else
+  ok "guest home: $VM_HOME (user ${VM_USER:-unknown})"
+fi
+
 # Recording the numbers is not the same as the VM having them. `colima start` on a VM that
 # is already up does not re-read the profile, so a pre-existing 'agent' VM — one you made
 # by hand months ago, or one from an older run of this recipe — keeps whatever size it was

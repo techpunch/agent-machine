@@ -109,6 +109,18 @@ cat >"$plist" <<PLIST
 PLIST
 ok "wrote auto-start agent $plist"
 
+# Record who the guest user actually is and where its home lives. Nothing sets these — Lima
+# derives the user from your macOS username and puts its home somewhere non-obvious (the
+# `.linux` suffix exists so a guest home cannot collide with a mounted host one, even
+# though nothing is mounted here). Every recipe writes via `~` and so does not care, but
+# "which ~/.claude does the agent actually see" is a fair question with no answer in the
+# repo, and guessing it in a doc would be a guess that goes stale. Measure it instead.
+vm_user=$("$colima" ssh --profile "$profile" -- id -un 2>/dev/null | /usr/bin/tr -d '\r' || true)
+vm_home=$("$colima" ssh --profile "$profile" -- sh -c 'echo $HOME' 2>/dev/null | /usr/bin/tr -d '\r' || true)
+[ -n "$vm_user" ] && set_server_var VM_USER "$vm_user"
+[ -n "$vm_home" ] && set_server_var VM_HOME "$vm_home"
+[ -n "$vm_home" ] && ok "guest user $vm_user, home $vm_home"
+
 uid=$(id -u)
 /bin/launchctl bootout "gui/$uid/$VM_AGENT_LABEL" 2>/dev/null || true
 /bin/launchctl bootstrap "gui/$uid" "$plist" 2>/dev/null \

@@ -97,6 +97,34 @@ in `make-headless` are load-bearing rather than ceremony. Anything that has to w
 login cannot assume the tailnet, which is the constraint that shapes the key server in
 `recipes/make-data-encrypted/recipe.md`.
 
+### Which `~/.claude` is which
+
+Worth stating explicitly, because there are three of them once the whole stack is built and
+"where is my sign-in" has three different answers.
+
+| Where | Path | Set by | Signed in |
+|---|---|---|---|
+| Host Mac | the admin user's `~/.claude` | you, before any of this | for cookbook work only |
+| Agent VM | `$VM_HOME/.claude` in the guest | Lima, not us | `have-vm-claude-code` |
+| Container | `/home/agent/.claude` | the Dockerfile | per tier, on a named volume |
+
+The host one is the session you run `/setup` from, and it never touches the others — the VM has no
+host mounts, so nothing on the Mac is visible from inside it.
+
+The VM one is whatever home Lima gave the guest user. Nothing here sets it: Lima derives the user
+from your macOS username and picks the home path itself. `have-agent-vm` reads the real values back
+and records them as `VM_USER` and `VM_HOME` in `server.env`, so the answer is knowable without
+guessing and verify notices if a rebuilt VM comes back different.
+
+The container ones are ours, at a fixed `/home/agent`, and there are two — one named volume per
+trust tier, so an untrusted project has a credential that is not the one your real work uses.
+
+Three stores means up to three sign-ins, and that is the honest cost of the split rather than an
+oversight. They are separate on purpose: revoking one does not disturb the others. The VM-level
+install is the starter mode — one agent, one project, no containers — and once `have-containers` is
+applied, project work should move into containers and the VM-level one is a bootstrap you can leave
+alone.
+
 ### The agent VM (the isolation boundary)
 
 All agents run inside one Linux VM, never directly on macOS. The VM is what makes "skip all
