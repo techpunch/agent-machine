@@ -96,17 +96,6 @@ if vm_ssh sudo systemctl is-active docker >/dev/null 2>&1; then
   vm_ssh sudo systemctl restart docker >/dev/null 2>&1 \
     || note "could not restart docker — do it by hand or container networking will be broken"
 
-  # Verify probes container egress from inside a container, and a verify must be cheap and
-  # offline. Pull the probe image here so it never has to. Without it verify reports the
-  # firewall as unverified rather than pretending a test it could not run came back clean.
-  if vm_ssh docker image inspect "$PROBE_IMAGE" >/dev/null 2>&1; then
-    ok "probe image $PROBE_IMAGE already present"
-  else
-    note "pulling $PROBE_IMAGE for the container egress probe"
-    vm_ssh docker pull "$PROBE_IMAGE" >/dev/null 2>&1 \
-      && ok "pulled $PROBE_IMAGE" \
-      || note "could not pull $PROBE_IMAGE — verify will report container egress as unverified"
-  fi
 fi
 
 set_server_var VM_NETWORK_BOUNDED "$(date -u +%Y-%m-%dT%H:%M:%SZ)"

@@ -253,10 +253,34 @@ network policy on it: out to the internet, nothing inward. Defining the VM as a 
 profile (CPU/RAM cap, no host mounts) keeps a server reproducible and fits reusing this setup per
 client.
 
-Agent containers, when they arrive, are built on Anthropic's reference devcontainer; its
-`init-firewall.sh` is also the natural starting point if and when default-deny egress is wanted for a
-particular workload. The exact image contents and Colima profile values are implementation details to
-pin when this moves into the checklist.
+Anthropic's reference devcontainer and its `init-firewall.sh` are the natural starting point if and
+when default-deny egress is wanted for a particular workload.
+
+### What this pulls in, and why each one
+
+Every dependency is a thing you are trusting on a machine that runs agents with permissions skipped,
+so the list is deliberately short and each entry has to beat the simpler alternative.
+
+| | Source | Why not something simpler |
+|---|---|---|
+| Homebrew | official installer, `Homebrew/install` | The only sane way to get the rest on macOS |
+| Tailscale | Homebrew cask, upstream signed app | The formula exists but the cask is what survives a reboot cleanly |
+| Colima | Homebrew formula, MIT | This *is* the simple option: Docker Desktop is proprietary and licensed, UTM is a GUI pet-VM tool, raw Lima needs a container runtime bolted on |
+| Lima's Ubuntu guest image | Canonical cloud image, via Colima | Colima's default; building our own buys nothing |
+| Claude Code | `claude.ai/install.sh`, first-party | The native installer keeps Node out of the VM and the image entirely; the npm route would drag a runtime in |
+| `debian:bookworm-slim` | Docker Official Image | Alpine is smaller but musl, and the Claude Code binary targets glibc |
+| apt packages | Debian and Ubuntu archives | — |
+
+Two deliberate non-dependencies. There is no separate probe image: verify tests container egress
+using the agent image and bash's `/dev/tcp`, because adding a second image to test the first is a
+registry round-trip and a supply-chain entry for something bash already does. And there is no SSH
+client in the agent image: clones are throwaway HTTPS and no key ever enters the VM, so it would be
+surface without a use.
+
+Nothing is pinned by digest. Tracking `bookworm-slim` and current Homebrew formulae means rebuilds
+pick up security updates, which matters more on a long-lived server than byte-identical rebuilds —
+the reproducibility that is load-bearing here is the Colima profile and the recipes, both of which
+are committed.
 
 ### Colima, and when UTM would be the answer instead
 

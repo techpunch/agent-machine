@@ -6,13 +6,21 @@
 #
 # Nothing secret is baked in. Credentials arrive at run time on a named volume, because
 # image layers leak if an image is ever shared.
+# Debian rather than Alpine: the Claude Code native installer targets glibc, and musl is
+# where that goes subtly wrong. Tracking bookworm rather than pinning a digest means the
+# image picks up Debian security updates on rebuild, which matters more here than
+# byte-for-byte reproducibility.
 FROM debian:bookworm-slim
 
 ARG AGENT_UID=1000
 ARG AGENT_GID=1000
 
+# Deliberately short. curl and ca-certificates for the installer, git because the agent
+# needs it, and ripgrep/jq/less because an agent actually reaches for them (less is git's
+# pager). No ssh client: clones are throwaway HTTPS and no key ever enters this VM, so it
+# would only be attack surface in a container that runs code you have not read.
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
-      ca-certificates curl git openssh-client ripgrep jq less \
+      ca-certificates curl git ripgrep jq less \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root by default. An agent running as root inside the container is one container

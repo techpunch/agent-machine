@@ -21,8 +21,6 @@ _admin_home() {
 STATE_DIR="${AGENT_MACHINE_STATE_DIR:-$(_admin_home)/.agent-machine}"
 TS_AGENT_LABEL="com.agent-machine.tailscale-relaunch"
 VM_AGENT_LABEL="com.agent-machine.agent-vm"
-# Pinned by digest-free tag but pulled once by apply, so verify never needs the network.
-PROBE_IMAGE="busybox:1.36"
 SERVER_ENV="$STATE_DIR/server.env"
 SERVER_LEDGER="$STATE_DIR/server.md"
 RUN_LOG="$STATE_DIR/run.log"

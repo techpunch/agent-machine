@@ -77,4 +77,30 @@ ver=$(vm_ssh docker run --rm "$image" claude --version 2>/dev/null | /usr/bin/tr
 [ -n "$ver" ] && ok "claude in the image: $ver" \
               || miss "claude is not on PATH inside the image"
 
+# The load-bearing check: containers must not bypass the VM's network policy. Their traffic
+# is forwarded rather than originated, so it is governed by a different nftables chain, and
+# a ruleset covering only the output hook looks correct in any test run over `colima ssh`
+# while leaving every container free to reach the tailnet and the LAN.
+#
+# The probe runs in the agent image using bash's /dev/tcp, so it needs no second image and
+# no registry — this is a verify, and a verify that reaches the network is neither cheap
+# nor trustworthy when the network is the thing under test.
+#
+# Three outcomes, not two. A probe that could not run must never be mistaken for a probe
+# that was refused, or the firewall reports green on a test that never executed.
+cprobe() { # $1 = address, $2 = port -> open | closed | unknown
+  vm_ssh docker run --rm --network "agent-trusted" "$image" \
+    bash -c "timeout 3 bash -c 'echo > /dev/tcp/$1/$2' 2>/dev/null && echo open || echo closed" \
+    2>/dev/null | /usr/bin/tr -d '\r' | /usr/bin/grep -E '^(open|closed)$' || echo unknown
+}
+
+for probe in "100.100.100.100 53 the tailnet range" "192.168.1.1 80 your LAN"; do
+  set -- $probe
+  case "$(cprobe "$1" "$2")" in
+    closed) ok "$3 blocked from inside a container" ;;
+    open)   miss "a container can reach $3 — the forward hook is not filtering" ;;
+    *)      blocked "could not probe $3 from a container — container egress is unverified, not proven good" ;;
+  esac
+done
+
 verify_result

@@ -55,13 +55,6 @@ running.
 VM: a public host resolves and connects, while a `100.64.0.0/10` and an RFC1918 address both fail.
 A firewall you have not watched fail closed is a firewall you are guessing about.
 
-When a container runtime is present it repeats the two denial probes from inside a container, since
-that is the path the agents actually use. Without a runtime those checks report `n/a` rather than
-passing silently.
-
-The container probe distinguishes three outcomes, not two. A refused connection is a pass; a
-successful one is a failure; a probe that could not run at all — image missing, daemon unhappy —
-reports `BLOCKED`, which exits 2. Collapsing "could not test" into "closed" is how a firewall check
-comes back green on the strength of a test that never executed, and this is a control whose entire
-job is to not be trusted. Apply pulls the probe image for the same reason: a verify must be cheap and
-offline, so it can never depend on reaching a registry.
+It checks the forward chain exists when a container runtime is present, but the behavioural probe
+from inside a real container lives in `have-containers` — that recipe has an agent image to run it
+in, so proving container egress needs no second image and no registry round-trip here.

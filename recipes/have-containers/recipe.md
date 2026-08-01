@@ -47,6 +47,12 @@ reach your tailnet and your LAN — and it looks correct in any test run over `c
 tests the VM's own namespace. Creating containers against an output-only ruleset would quietly undo
 the isolation the whole design rests on, so this recipe refuses to run.
 
+Verify goes further than apply and proves it behaviourally: it starts a container on the trusted
+network and tries to reach the tailnet and an RFC1918 address, using the agent image and bash's
+`/dev/tcp` so no extra image is needed. A probe that could not run reports `BLOCKED` rather than
+passing — mistaking "could not test" for "was refused" is how a firewall check comes back green on a
+test that never executed.
+
 ## Credentials live on a volume, not in the image
 
 The image carries no secret. `~/.claude` is a named volume mounted at run time, so a sign-in survives
