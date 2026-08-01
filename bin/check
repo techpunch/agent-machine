@@ -1,0 +1,135 @@
+#!/bin/bash
+# Everything that can be checked without a Mac to provision. Run before pushing: a wrong
+# apply.sh runs as root on every server that pulls this repo, and nothing else stands
+# between an edit and that.
+#
+#   bin/check          syntax, lint, metadata, and a dry run of the driver
+#   bin/check --quick  skip shellcheck
+#
+# What it cannot tell you is whether a recipe actually works. Only a real server does that.
+
+set -uo pipefail
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+fails=0
+pass() { printf '  ok    %s\n' "$*"; }
+fail() { printf '  FAIL  %s\n' "$*"; fails=$((fails + 1)); }
+head() { printf '\n== %s\n' "$*"; }
+
+head "shell syntax"
+for f in bin/cookbook bin/check lib/common.sh recipes/*/*.sh; do
+  bash -n "$f" 2>/dev/null && pass "$f" || fail "$f does not parse"
+done
+
+head "shellcheck"
+if [ "${1:-}" = "--quick" ]; then
+  printf '  n/a   skipped (--quick)\n'
+elif command -v shellcheck >/dev/null 2>&1; then
+  # SC1091: common.sh is sourced by a path shellcheck cannot follow from every recipe dir.
+  for f in bin/cookbook bin/check lib/common.sh recipes/*/*.sh; do
+    out=$(shellcheck -e SC1091 -S warning "$f" 2>&1) && pass "$f" || { fail "$f"; printf '%s\n' "$out" | /usr/bin/sed 's/^/        /'; }
+  done
+else
+  printf '  n/a   shellcheck not installed (brew install shellcheck)\n'
+fi
+
+head "scripts are executable"
+for f in bin/cookbook bin/check recipes/*/*.sh; do
+  [ -x "$f" ] && pass "$f" || fail "$f is not executable — the driver skips it silently"
+done
+
+head "recipe metadata"
+for d in recipes/*/; do
+  r=$(basename "$d")
+  key() { /usr/bin/awk -v k="$1" 'NR==1&&$0=="---"{i=1;next} i&&$0=="---"{exit} i&&index($0,k":")==1{sub("^"k": *","");print;exit}' "$d/recipe.md"; }
+  list() { printf '%s' "$(key "$1")" | /usr/bin/tr -d '[]' | /usr/bin/tr ',' ' '; }
+
+  [ "$(key name)" = "$r" ] || fail "$r: name in frontmatter is '$(key name)'"
+  [ -n "$(key summary)" ]  || fail "$r: no summary"
+
+  # A blocked recipe must have no scripts, and a ready one must have both.
+  if [ "$(key status)" = "blocked" ]; then
+    [ -n "$(key blocked_by)" ] || fail "$r: blocked with no blocked_by"
+    [ -e "$d/apply.sh" ] && fail "$r: blocked but has apply.sh"
+  else
+    [ -f "$d/verify.sh" ] || fail "$r: no verify.sh and not blocked"
+    [ -f "$d/apply.sh" ]  || fail "$r: no apply.sh and not blocked"
+  fi
+
+  for dep in $(list requires); do
+    [ -f "recipes/$dep/recipe.md" ] || fail "$r: requires '$dep', which does not exist"
+  done
+  for n in $(list needs); do
+    [ -f "prereqs/$n.md" ] || fail "$r: needs '$n', which has no file in prereqs/"
+  done
+done
+[ $fails -eq 0 ] && pass "all recipes well-formed"
+
+head "goals and prereqs"
+for g in goals/*.md; do
+  n=$(basename "$g" .md)
+  rs=$(/usr/bin/awk 'NR==1&&$0=="---"{i=1;next} i&&$0=="---"{exit} i&&index($0,"recipes:")==1{sub("^recipes: *","");print;exit}' "$g" | /usr/bin/tr -d '[]' | /usr/bin/tr ',' ' ')
+  [ -n "$rs" ] || fail "goal $n names no recipes"
+  for r in $rs; do
+    [ -f "recipes/$r/recipe.md" ] || fail "goal $n names recipe '$r', which does not exist"
+  done
+done
+for p in prereqs/*.md; do
+  n=$(basename "$p" .md)
+  w=$(/usr/bin/awk 'NR==1&&$0=="---"{i=1;next} i&&$0=="---"{exit} i&&index($0,"when:")==1{sub("^when: *","");print;exit}' "$p")
+  case "$w" in
+    before-you-start|during) ;;
+    *) fail "prereq $n has when='$w' (must be before-you-start or during)" ;;
+  esac
+  # preflight strips frontmatter with a sed range, which a stray --- in the body would break.
+  [ "$(/usr/bin/grep -c '^---$' "$p")" -eq 2 ] || fail "prereq $n has more than two --- lines; preflight would mangle it"
+done
+[ $fails -eq 0 ] && pass "all goals and prereqs resolve"
+
+head "docs"
+# Relative links resolve from the file that contains them, not from the repo root.
+broken_links=""
+for f in $(/usr/bin/find . -name '*.md' -not -path './.git/*'); do
+  for l in $(/usr/bin/grep -oE '\]\([^)]+\)' "$f" | /usr/bin/tr -d '()]'); do
+    case "$l" in
+      http*) ;;
+      \#*)   ;;
+      *) [ -e "$(dirname "$f")/${l%%#*}" ] || broken_links="$broken_links
+$f -> $l" ;;
+    esac
+  done
+done
+[ -z "$broken_links" ] && pass "no broken relative links" \
+  || { fail "broken links:"; printf '%s\n' "$broken_links" | /usr/bin/sed '/^$/d;s/^/        /'; }
+
+head "driver dry run"
+# A throwaway state dir: never touch the real one, and prove the driver works from nothing.
+tmp=$(/usr/bin/mktemp -d)
+trap '/bin/rm -rf "$tmp"' EXIT
+export AGENT_MACHINE_STATE_DIR="$tmp"
+
+./bin/cookbook >/dev/null 2>&1        && pass "usage"        || fail "usage"
+./bin/cookbook list >/dev/null 2>&1   && pass "list"         || fail "list"
+for g in goals/*.md; do
+  n=$(basename "$g" .md)
+  ./bin/cookbook plan "$n" >/dev/null 2>&1 && pass "plan $n" || fail "plan $n"
+done
+all_goals=""
+for g in goals/*.md; do all_goals="$all_goals $(basename "$g" .md)"; done
+# shellcheck disable=SC2086
+./bin/cookbook plan $all_goals >/dev/null 2>&1 \
+  && pass "plan (all goals at once)" || fail "plan with every goal at once"
+
+# Unknown targets must exit non-zero, not print an error and succeed.
+for c in plan preflight apply; do
+  ./bin/cookbook "$c" definitely-not-a-thing >/dev/null 2>&1
+  [ $? -ne 0 ] && pass "$c rejects an unknown target" || fail "$c exits 0 for an unknown target"
+done
+
+printf '\n'
+if [ $fails -eq 0 ]; then
+  printf 'all checks passed\n'
+else
+  printf '%s check(s) failed\n' "$fails"
+fi
+exit $((fails > 0))

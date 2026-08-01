@@ -1,0 +1,337 @@
+#!/bin/bash
+# The cookbook driver. Resolves prerequisites, verifies before applying, applies in order,
+# and records what stuck. Works on its own — Claude is useful here for judgment (reading a
+# gate, supplying a secret, fixing a broken recipe), not for bookkeeping.
+#
+#   cookbook goals                 the outcomes you can pick, and which are already true
+#   cookbook preflight <goal>...   what a human must arrange elsewhere first
+#   cookbook plan <goal>...        the resolved order, without running anything
+#   cookbook apply <goal>...       verify, apply what is missing, re-verify, record
+#   cookbook status [recipe...]    what is already true on this server (default: everything)
+#   cookbook list                  every recipe and whether it is ready or blocked
+#   cookbook log [n]               the last n lines of the run log
+#
+# Goals and recipes are interchangeable as arguments; goals are the human-facing names.
+# Exit codes mirror the recipes: 0 done, 1 failed, 2 blocked, 3 stopped at a manual gate.
+
+COOKBOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$COOKBOOK_DIR"
+. lib/common.sh
+
+# common.sh sets errexit for recipes, where aborting on the first failure is right. The
+# driver's whole job is handling non-zero exits from recipes, so it must not inherit that.
+set +e -uo pipefail
+
+RECIPES_DIR="$COOKBOOK_DIR/recipes"
+GOALS_DIR="$COOKBOOK_DIR/goals"
+PREREQS_DIR="$COOKBOOK_DIR/prereqs"
+
+# Secrets reach a root recipe as `sudo VAR=value ...`, so they never land in server.env.
+# This is the escape hatch, not the default — it is visible in ps for the life of the
+# command. The default is the Keychain, via secret_get in lib/common.sh.
+PASSTHROUGH="AGENT_MACHINE_STATE_DIR TS_AUTHKEY ADMIN_PASSWORD SERVER_NAME FILEVAULT_POLICY HEADLESS_CONFIRMED"
+
+# ---- recipe metadata --------------------------------------------------------
+
+all_recipes() { /usr/bin/find "$RECIPES_DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort; }
+exists()      { [ -f "$RECIPES_DIR/$1/recipe.md" ]; }
+
+all_goals()   { [ -d "$GOALS_DIR" ] && /usr/bin/find "$GOALS_DIR" -maxdepth 1 -name '*.md' -exec basename {} .md \; | sort; }
+goal_exists() { [ -f "$GOALS_DIR/$1.md" ]; }
+
+# Read one frontmatter key from any of the three file kinds — they share a format so this
+# is written once. The frontmatter is the block between the first two --- lines.
+meta_file() {
+  /usr/bin/awk -v key="$2" '
+    NR==1 && $0=="---" { inside=1; next }
+    inside && $0=="---" { exit }
+    inside && index($0, key ":")==1 { sub("^" key ": *", ""); print; exit }
+  ' "$1"
+}
+
+meta()        { meta_file "$RECIPES_DIR/$1/recipe.md" "$2"; }
+goal_meta()   { meta_file "$GOALS_DIR/$1.md" "$2"; }
+prereq_meta() { meta_file "$PREREQS_DIR/$1.md" "$2"; }
+
+_list_key()   { printf '%s' "$1" | /usr/bin/tr -d '[]' | /usr/bin/tr ',' ' '; }
+
+requires_of()   { _list_key "$(meta "$1" requires)"; }
+needs_of()      { _list_key "$(meta "$1" needs)"; }
+goal_recipes()  { _list_key "$(goal_meta "$1" recipes)"; }
+is_blocked()    { [ "$(meta "$1" status)" = "blocked" ]; }
+needs_root()    { [ "$(meta "$1" root)" = "yes" ]; }
+
+# A goal is a name a human would pick; a recipe is a name the graph uses. Accept either
+# everywhere, so `apply run-agents` and `apply have-vm-claude-code` both work.
+expand_targets() {
+  local t out=""
+  for t in "$@"; do
+    if goal_exists "$t"; then out="$out $(goal_recipes "$t")"
+    elif exists "$t"; then out="$out $t"
+    else printf 'error: no goal or recipe named %s\n' "$t" >&2; exit 1
+    fi
+  done
+  printf '%s' "$out"
+}
+
+# ---- dependency resolution --------------------------------------------------
+
+_resolved=""
+_visiting=""
+
+# Post-order walk: a recipe is emitted only after everything it requires.
+resolve() {
+  local r="$1" d
+  exists "$r" || { printf 'error: no recipe named %s\n' "$r" >&2; exit 1; }
+  case " $_resolved " in *" $r "*) return 0 ;; esac
+  case " $_visiting " in
+    *" $r "*) printf 'error: dependency cycle through %s\n' "$r" >&2; exit 1 ;;
+  esac
+  _visiting="$_visiting $r"
+  for d in $(requires_of "$r"); do resolve "$d"; done
+  _visiting="${_visiting% $r}"
+  _resolved="$_resolved $r"
+}
+
+# Several roots resolve into one order, so selecting three goals at once gives a single
+# correctly-ordered run rather than three overlapping ones.
+plan_for() { local r; _resolved=""; _visiting=""; for r in "$@"; do resolve "$r"; done; printf '%s\n' $_resolved; }
+
+# ---- running ----------------------------------------------------------------
+
+# Root recipes get sudo, carrying only the variables a recipe is allowed to read.
+run_script() {
+  local recipe="$1" script="$2" v
+  local path="$RECIPES_DIR/$recipe/$script"
+  [ -x "$path" ] || return 4
+  if needs_root "$recipe" && ! is_root; then
+    local -a env_args=()
+    for v in $PASSTHROUGH; do [ -n "${!v:-}" ] && env_args+=("$v=${!v}"); done
+    # bash 3.2 (what macOS ships) treats "${arr[@]}" on an empty array as unset under
+    # set -u, so the common case — a root recipe with no passthrough vars — would abort
+    # before sudo ran. The +expansion form yields nothing at all when the array is empty.
+    /usr/bin/sudo ${env_args[@]+"${env_args[@]}"} "$path"
+  else
+    "$path"
+  fi
+}
+
+# Verify results are cached for the life of one invocation. Without this, `goals` alone
+# re-verifies the same recipe once per goal that depends on it — 61 runs across seven
+# goals on the current set, several of them wanting sudo — and /setup then repeats the
+# whole sweep for preflight and again for apply. Verifies are read-only by contract, so
+# their answer cannot change mid-invocation; anything that does change the system
+# invalidates the entry explicitly via forget_verify.
+# bash 3.2 has no associative arrays, so this is a flat "name=rc name=rc" string. The `=`
+# anchors the match, so have-agent-vm never matches have-agent-vm-extra.
+_vcache=""
+VERIFY_RC=0
+
+# Sets VERIFY_RC rather than printing. Printing would mean callers wrapping this in $( ),
+# which runs in a subshell, so every cache write would be discarded the moment it was made
+# and the cache would silently do nothing.
+verify_rc() {
+  local recipe="$1" rest
+  case " $_vcache " in
+    *" $recipe="*)
+      rest="${_vcache##* $recipe=}"
+      VERIFY_RC="${rest%% *}"
+      return 0 ;;
+  esac
+  run_script "$recipe" verify.sh >/dev/null 2>&1; VERIFY_RC=$?
+  _vcache="$_vcache $recipe=$VERIFY_RC"
+}
+
+# Applying a recipe changes the answer, so drop it and let the next read re-run.
+forget_verify() {
+  local kept="" entry
+  for entry in $_vcache; do
+    case "$entry" in "$1="*) ;; *) kept="$kept $entry" ;; esac
+  done
+  _vcache="$kept"
+}
+
+state_word() {
+  case "$1" in
+    0) printf 'ok' ;;
+    1) printf 'todo' ;;
+    2) printf 'blocked' ;;
+    4) printf 'no-script' ;;
+    *) printf "exit-$1" ;;
+  esac
+}
+
+# ---- commands ---------------------------------------------------------------
+
+cmd_list() {
+  printf '%-24s %-8s %s\n' RECIPE STATUS SUMMARY
+  local r
+  for r in $(all_recipes); do
+    printf '%-24s %-8s %s\n' "$r" "$(is_blocked "$r" && echo blocked || echo ready)" "$(meta "$r" summary)"
+  done
+}
+
+cmd_status() {
+  local targets="$*" r rc
+  [ -n "$targets" ] || targets="$(all_recipes)"
+  for r in $targets; do
+    exists "$r" || { printf 'error: no recipe named %s\n' "$r" >&2; exit 1; }
+    if is_blocked "$r"; then
+      printf '\n%-24s blocked  (%s)\n' "$r" "$(meta "$r" blocked_by)"
+      continue
+    fi
+    local out; out=$(run_script "$r" verify.sh 2>&1); rc=$?
+    printf '\n%-24s %s\n' "$r" "$(state_word $rc)"
+    if [ $rc -ne 0 ]; then
+      # Normally the MISSING/BLOCKED lines are the whole story. When there are none, the
+      # verify failed for some other reason (sudo declined, a tool absent) — show it all
+      # rather than leaving a bare "todo" with no explanation.
+      local reasons; reasons=$(printf '%s\n' "$out" | /usr/bin/grep -E 'MISSING|BLOCKED')
+      printf '%s\n' "${reasons:-$(printf '%s\n' "$out" | /usr/bin/sed 's/^/  /')}"
+    fi
+  done
+}
+
+cmd_plan() {
+  local r order targets
+  # resolve() exits inside a command substitution, where its status would be lost, so the
+  # caller has to check the substitution itself.
+  # Two substitutions, not one nested pair: expand_targets exits inside its own subshell,
+  # so a nested $( ) would swallow the failure and leave an empty plan looking like success.
+  targets=$(expand_targets "$@") || exit 1
+  order=$(plan_for $targets) || exit 1
+  for r in $order; do
+    printf '%-24s %s%s\n' "$r" "$(needs_root "$r" && echo '[sudo] ')" "$(meta "$r" summary)"
+  done
+}
+
+# The selectable outcomes, in words a human would use, each marked with whether it is
+# already true. This is what /setup offers; recipe names never reach the user.
+cmd_goals() {
+  local g r order state
+  printf '%-20s %-9s %s\n' GOAL STATE SUMMARY
+  for g in $(all_goals); do
+    state=done
+    order=$(plan_for $(goal_recipes "$g")) || exit 1
+    for r in $order; do
+      if is_blocked "$r"; then state=blocked; break; fi
+      verify_rc "$r"; [ "$VERIFY_RC" -eq 0 ] || { state=available; break; }
+    done
+    printf '%-20s %-9s %s\n' "$g" "$state" "$(goal_meta "$g" summary)"
+  done
+}
+
+# What a human has to arrange elsewhere before this can run. Only prerequisites of recipes
+# that are not already satisfied, so coming back months later does not re-list the
+# Tailscale key you minted in March.
+cmd_preflight() {
+  local order targets r n seen="" pending="" p
+  # Two substitutions, not one nested pair: expand_targets exits inside its own subshell,
+  # so a nested $( ) would swallow the failure and leave an empty plan looking like success.
+  targets=$(expand_targets "$@") || exit 1
+  order=$(plan_for $targets) || exit 1
+
+  for r in $order; do
+    is_blocked "$r" && continue
+    verify_rc "$r"; [ "$VERIFY_RC" -eq 0 ] && continue
+    for n in $(needs_of "$r"); do
+      case " $seen " in *" $n "*) continue ;; esac
+      seen="$seen $n"
+      [ -f "$PREREQS_DIR/$n.md" ] || { printf 'error: recipe %s needs undefined prereq %s\n' "$r" "$n" >&2; exit 1; }
+      pending="$pending $n"
+    done
+  done
+
+  if [ -z "$pending" ]; then
+    printf 'Nothing to arrange — everything this needs is already in place.\n'
+    return 0
+  fi
+
+  # Lead-time items first: the ones that are slow, or that you have to physically own.
+  for want in before-you-start during; do
+    for p in $pending; do
+      [ "$(prereq_meta "$p" when)" = "$want" ] || continue
+      printf '\n%s  [%s]\n' "$(prereq_meta "$p" summary)" "$p"
+      /usr/bin/sed -n '/^---$/,/^---$/!p' "$PREREQS_DIR/$p.md" | /usr/bin/sed '/^$/d;s/^/  /'
+    done
+  done
+  printf '\n'
+}
+
+cmd_log() {
+  [ -f "$RUN_LOG" ] || { printf 'no run log yet at %s\n' "$RUN_LOG"; return 0; }
+  printf '%s\n\n' "$RUN_LOG"
+  /usr/bin/tail -n "${1:-40}" "$RUN_LOG"
+}
+
+cmd_apply() {
+  local target="$*" order targets r rc
+  # Two substitutions, not one nested pair: expand_targets exits inside its own subshell,
+  # so a nested $( ) would swallow the failure and leave an empty plan looking like success.
+  targets=$(expand_targets "$@") || exit 1
+  order=$(plan_for $targets) || exit 1
+  [ -n "$order" ] || { printf 'error: nothing to do for %s\n' "$target" >&2; exit 1; }
+
+  for r in $order; do
+    if is_blocked "$r"; then
+      printf 'blocked: %s — %s\n' "$r" "$(meta "$r" blocked_by)" >&2
+      printf 'It has no scripts yet, so the chain cannot continue. See recipes/%s/recipe.md\n' "$r" >&2
+      exit 2
+    fi
+  done
+
+  printf 'plan: %s\n\n' "$(printf '%s ' $order)"
+  log_event run-start "$target" "plan: $(printf '%s ' $order)"
+
+  for r in $order; do
+    printf '== %s\n' "$r"
+    verify_rc "$r"; rc=$VERIFY_RC
+    if [ "$rc" -eq 0 ]; then
+      printf '   already satisfied\n'
+      log_event skipped "$r" "already satisfied"
+      continue
+    fi
+
+    # tee rather than capture: the user still watches it stream, and the log gets the same
+    # bytes. PIPESTATUS carries apply's own exit code past the pipe.
+    log_event apply "$r" "starting"
+    run_script "$r" apply.sh 2>&1 | /usr/bin/tee -a "$RUN_LOG"; rc=${PIPESTATUS[0]}
+    case $rc in
+      0) ;;
+      3) log_event gate "$r" "stopped for a human step"
+         printf '\nStopped at a gate in %s. Nothing after it has run.\n' "$r" >&2; exit 3 ;;
+      *) log_event failed "$r" "apply exited $rc"
+         printf '\napply failed in %s (exit %s)\n' "$r" "$rc" >&2; exit 1 ;;
+    esac
+
+    # The ledger records what verified true afterwards, not what apply attempted. The
+    # cached answer is stale the moment apply ran, so drop it first.
+    forget_verify "$r"
+    verify_rc "$r"; rc=$VERIFY_RC
+    if [ $rc -eq 0 ]; then
+      record_applied "$r" "$(meta "$r" summary)"
+      log_event applied "$r" "$(meta "$r" summary)"
+      printf '   applied and verified\n'
+    else
+      log_event failed "$r" "applied but verify still exits $rc"
+      printf '\n%s applied but still does not verify:\n' "$r" >&2
+      run_script "$r" verify.sh 2>&1 | /usr/bin/tee -a "$RUN_LOG" >&2
+      exit 1
+    fi
+  done
+
+  log_event run-done "$target" "all verified"
+  printf '\ndone: %s\n' "$target"
+  printf 'log:  %s\n' "$RUN_LOG"
+}
+
+case "${1:-}" in
+  list)      cmd_list ;;
+  goals)     cmd_goals ;;
+  status)    shift; cmd_status "$@" ;;
+  preflight) shift; [ $# -gt 0 ] || { echo "usage: cookbook preflight <goal|recipe>..." >&2; exit 1; }; cmd_preflight "$@" ;;
+  plan)      shift; [ $# -gt 0 ] || { echo "usage: cookbook plan <goal|recipe>..." >&2; exit 1; }; cmd_plan "$@" ;;
+  apply)     shift; [ $# -gt 0 ] || { echo "usage: cookbook apply <goal|recipe>..." >&2; exit 1; }; cmd_apply "$@" ;;
+  log)       shift; cmd_log "${1:-40}" ;;
+  *)         /usr/bin/sed -n '2,16p' "${BASH_SOURCE[0]}" | /usr/bin/sed 's/^# \{0,1\}//' ;;
+esac

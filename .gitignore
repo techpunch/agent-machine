@@ -1,0 +1,5 @@
+# Per-server state lives in ~/.agent-machine, never here.
+.DS_Store
+
+# Machine-local Claude Code settings: personal permission grants, not shared config.
+.claude/settings.local.json
