@@ -17,6 +17,7 @@ writes the ledger and the log:
 ./bin/cookbook apply <goal>...      # do it
 ./bin/cookbook status               # what is true right now, recipe by recipe
 ./bin/cookbook list                 # every recipe, including the ones not written yet
+./bin/cookbook stale                # what has gone out of date
 ./bin/cookbook log                  # every action and result, with timestamps
 ```
 
@@ -24,8 +25,23 @@ Goals and recipe names are interchangeable as arguments — `apply run-agents` a
 `apply have-vm-claude-code` both work. Goals are the human-facing names, and several can be given at
 once: they resolve into one correctly-ordered run rather than several overlapping ones.
 
-Two narrower slash commands sit alongside `/setup`: `/cookbook` runs status and explains it, and
-`/cook <recipe>` applies a single recipe, for when you know exactly what you want.
+Three narrower slash commands sit alongside `/setup`: `/cookbook` runs status and explains it,
+`/cook <recipe>` applies a single recipe, and `/update` researches what `stale` could not answer and
+then patches the machine or the cookbook.
+
+## Keeping it current
+
+`stale` is the counterpart to `status`. Status asks whether this server matches what the cookbook
+intends; stale asks whether what the cookbook intends is still a good idea. The second drifts on
+other people's release schedules rather than on anything this machine did, which is why it is a
+report rather than a recipe — a recipe makes a state true and keeps it true, and "up to date" is
+never true for long.
+
+It splits into two halves that want different treatment. Outdated packages, an old container image
+and pending macOS updates are patching, and they are fixed on the machine. Whether the base image
+codename is still Debian's current stable, or whether a `blocked_by` reason has quietly expired, are
+questions about the world — they need a network and judgment, and their fix is a commit that reaches
+every server that pulls the repo. Run `/update` periodically and it does both.
 
 ## Before you change a recipe
 

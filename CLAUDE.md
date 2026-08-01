@@ -83,8 +83,9 @@ That file is the single source for it; do not restate it elsewhere.
   has to happen before the run starts. Recipes point at these with `needs:`.
 - `lib/common.sh` — shared helpers, sourced by every script. Output helpers, the server-state accessors,
   and macOS quirk handling (sudo home resolution, pmset keys, finding the Tailscale CLI).
-- `.claude/commands/` — `setup` (guided, end to end), `cookbook` (report), `cook` (apply one recipe).
-  Thin wrappers over `bin/cookbook` that say what Claude's part of the job is.
+- `.claude/commands/` — `setup` (guided, end to end), `cookbook` (report), `cook` (apply one
+  recipe), `update` (what has gone stale, and fix it). Thin wrappers over `bin/cookbook` that say
+  what Claude's part of the job is.
 - `docs/` — `running-the-cookbook.md` (the driver's guarantees, the two records, what not to do),
   `secrets-and-egress.md` (where agents may run, and with what), `host-agent-design.md` (why the
   host and VM split), `shared-setup.md` (once, before the first server).

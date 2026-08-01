@@ -9,6 +9,7 @@
 #   cookbook apply <goal>...       verify, apply what is missing, re-verify, record
 #   cookbook status [recipe...]    what is already true on this server (default: everything)
 #   cookbook list                  every recipe and whether it is ready or blocked
+#   cookbook stale                 what has gone out of date: packages, images, versions
 #   cookbook log [n]               the last n lines of the run log
 #
 # Goals and recipes are interchangeable as arguments; goals are the human-facing names.
@@ -258,6 +259,96 @@ cmd_preflight() {
   printf '\n'
 }
 
+# What has gone stale. Deliberately not a recipe: a recipe makes a target state true and
+# keeps it true, and "up to date" is never true for long — it drifts on someone else's
+# release schedule, not on anything this server did.
+#
+# This half is facts only. Whether a version is *current* is a question about the world
+# that needs a network and judgment, so it belongs to /update; everything here is
+# answerable on the machine, and every call is time-limited because a stale-check that
+# hangs a headless server is worse than no stale-check.
+cmd_stale() {
+  local rc out age
+
+  printf '== this server\n'
+
+  if brew=$(brew_bin); then
+    printf '   fetching brew metadata (network)\n'
+    rc=0; with_timeout 120 "$brew" update --quiet >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 124 ] && printf '   brew        update timed out — results below may be stale\n'
+    out=$(with_timeout 60 "$brew" outdated --quiet 2>/dev/null || true)
+    if [ -n "$out" ]; then
+      printf '   brew        %s outdated: %s\n' "$(printf '%s\n' "$out" | /usr/bin/wc -l | /usr/bin/tr -d ' ')" "$(printf '%s ' $out)"
+      printf '               fix: %s upgrade\n' "$brew"
+    else
+      printf '   brew        everything current\n'
+    fi
+  else
+    printf '   brew        not installed\n'
+  fi
+
+  rc=0
+  out=$(with_timeout 180 /usr/sbin/softwareupdate -l 2>&1) || rc=$?
+  if [ "$rc" -eq 124 ]; then
+    printf '   macOS       softwareupdate timed out\n'
+  elif printf '%s' "$out" | /usr/bin/grep -q 'No new software'; then
+    printf '   macOS       no updates\n'
+  else
+    printf '   macOS       updates available:\n'
+    printf '%s\n' "$out" | /usr/bin/grep -E '^\s+\*|Label:' | /usr/bin/sed 's/^/               /'
+    printf '               fix: sudo softwareupdate -ia --restart\n'
+  fi
+
+  if colima_bin >/dev/null 2>&1 && with_timeout 20 "$(colima_bin)" ssh --profile "${VM_PROFILE:-agent}" -- true >/dev/null 2>&1; then
+    rc=0
+    with_timeout 180 "$(colima_bin)" ssh --profile "${VM_PROFILE:-agent}" -- sudo apt-get update -qq >/dev/null 2>&1 || rc=$?
+    out=$(with_timeout 60 "$(colima_bin)" ssh --profile "${VM_PROFILE:-agent}" -- \
+            sh -c 'apt list --upgradable 2>/dev/null | grep -c upgradable' 2>/dev/null | /usr/bin/tr -dc '0-9' || true)
+    printf '   agent VM    %s packages upgradable\n' "${out:-unknown}"
+    [ "${out:-0}" -gt 0 ] 2>/dev/null && printf '               fix: colima ssh --profile %s -- sudo apt-get upgrade -y\n' "${VM_PROFILE:-agent}"
+
+    with_timeout 20 "$(colima_bin)" ssh --profile "${VM_PROFILE:-agent}" -- test -f /var/run/reboot-required >/dev/null 2>&1 \
+      && printf '   agent VM    reboot required — colima restart --profile %s\n' "${VM_PROFILE:-agent}"
+
+    # An image older than the Dockerfile that built it is a rebuild nobody ran.
+    local img_epoch df_epoch
+    img_epoch=$(with_timeout 30 "$(colima_bin)" ssh --profile "${VM_PROFILE:-agent}" -- \
+      sh -c "date -d \"\$(docker image inspect --format '{{.Created}}' ${VM_AGENT_IMAGE:-agent-machine/agent:latest} 2>/dev/null)\" +%s 2>/dev/null" 2>/dev/null | /usr/bin/tr -dc '0-9' || true)
+    df_epoch=$(/usr/bin/stat -f %m "$RECIPES_DIR/have-containers/Dockerfile" 2>/dev/null || echo 0)
+    if [ -n "$img_epoch" ]; then
+      age=$(( ( $(date +%s) - img_epoch ) / 86400 ))
+      if [ "$df_epoch" -gt "$img_epoch" ]; then
+        printf '   agent image built %s days ago, older than the Dockerfile — rebuild\n' "$age"
+        printf '               fix: ./bin/cookbook apply have-containers\n'
+      else
+        printf '   agent image built %s days ago\n' "$age"
+        [ "$age" -gt 30 ] && printf '               a rebuild picks up base-image security updates\n'
+      fi
+    else
+      printf '   agent image not built yet\n'
+    fi
+
+    out=$(with_timeout 30 "$(colima_bin)" ssh --profile "${VM_PROFILE:-agent}" -- \
+            sh -c '. ~/.bashrc 2>/dev/null; claude --version' 2>/dev/null | /usr/bin/tr -d '\r' || true)
+    [ -n "$out" ] && printf '   claude      %s in the VM\n' "$out"
+  else
+    printf '   agent VM    not reachable — VM checks skipped\n'
+  fi
+
+  # Judgement calls: true answers live on the internet, not on this box. Named here so
+  # they cannot be forgotten; /update is what actually researches them.
+  printf '\n== needs judgment  (run /update, which researches these)\n'
+  printf '   base image  %s\n' "$(/usr/bin/awk '/^FROM /{print $2}' "$RECIPES_DIR/have-containers/Dockerfile" 2>/dev/null)"
+  printf '               is that codename still Debian current stable, and in full support?\n'
+  if colima_bin >/dev/null 2>&1; then
+    printf '   colima      %s\n' "$(with_timeout 20 "$(colima_bin)" version 2>/dev/null | /usr/bin/head -1 || echo unknown)"
+    printf '               any release with fixes worth taking?\n'
+  fi
+  printf '   claude code  installed from claude.ai/install.sh — any advisory affecting it?\n'
+  printf '   blocked      %s recipe(s) deferred; has anything they wait on changed?\n' \
+    "$(for r in $(all_recipes); do is_blocked "$r" && echo x; done | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
+}
+
 cmd_log() {
   [ -f "$RUN_LOG" ] || { printf 'no run log yet at %s\n' "$RUN_LOG"; return 0; }
   printf '%s\n\n' "$RUN_LOG"
@@ -332,6 +423,7 @@ case "${1:-}" in
   preflight) shift; [ $# -gt 0 ] || { echo "usage: cookbook preflight <goal|recipe>..." >&2; exit 1; }; cmd_preflight "$@" ;;
   plan)      shift; [ $# -gt 0 ] || { echo "usage: cookbook plan <goal|recipe>..." >&2; exit 1; }; cmd_plan "$@" ;;
   apply)     shift; [ $# -gt 0 ] || { echo "usage: cookbook apply <goal|recipe>..." >&2; exit 1; }; cmd_apply "$@" ;;
+  stale)     cmd_stale ;;
   log)       shift; cmd_log "${1:-40}" ;;
   *)         /usr/bin/sed -n '2,16p' "${BASH_SOURCE[0]}" | /usr/bin/sed 's/^# \{0,1\}//' ;;
 esac

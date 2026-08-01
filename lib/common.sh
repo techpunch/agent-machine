@@ -188,6 +188,23 @@ secret_store_hint() {
     "$SECRET_SERVICE" "$1"
 }
 
+# Run a command with a hard time limit. macOS ships no timeout(1), and several things
+# worth checking — softwareupdate, a brew fetch, ssh into a wedged VM — can hang forever on
+# a server with nobody at the screen. Exits 124 on timeout, like GNU timeout does.
+with_timeout() {
+  local secs="$1"; shift
+  /usr/bin/perl -e '
+    my $secs = shift @ARGV;
+    my $pid = fork();
+    if ($pid == 0) { exec @ARGV or exit 127; }
+    local $SIG{ALRM} = sub { kill "TERM", $pid; waitpid($pid, 0); exit 124 };
+    alarm $secs;
+    waitpid($pid, 0);
+    alarm 0;
+    exit($? >> 8);
+  ' "$secs" "$@"
+}
+
 # ---- macOS helpers ----------------------------------------------------------
 
 # ComputerName is a human label and may contain spaces and capitals. LocalHostName,
