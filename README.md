@@ -22,15 +22,15 @@ Then in claude run `/setup`:
 
 ![Typing /setup in Claude Code, showing the command described as "Set this Mac up as an agent server, start to finish, with no docs to read"](docs/images/setup-command.png)
 
-That's it! `/setup` asks what you want the machine to do, tells you only the handful of
-things it cannot do for you, and does the rest.
+That's it! `/setup` asks what end state you want your machine in, and does as much of the
+heavy lifting for you as it can to get you to your desired state, asking you for things
+along the way only when it needs to.
 
 You can stop reading now if you'd like and just do it.
 
 ## What `/setup` does
 
-It's a conversation that asks which outcomes you want, then automagically does as much of
-the work for you as it can, prompting to do the things it can't do.
+It's a conversation that gets you to your end goal machine state as quickly as possible.
 
 Before it starts, it tells you what it needs from you: a Tailscale key, your admin
 password set up, an HDMI dummy plug if you want the machine headless.
