@@ -45,6 +45,38 @@ That costs git over SSH, which is why the workflow above clones over HTTPS. It a
 cannot reach your tailnet, which was the pivot this design worried about most and now gets
 structurally rather than by rule.
 
+## Your agent cannot read the web, and that will bite
+
+`balanced` allows AI provider APIs, package managers, code hosts, container registries and common
+cloud services. That covers the agent working, dependencies installing and git — and nothing else.
+Reading a vendor's API reference, a blog post or a Stack Overflow answer is denied.
+
+This is not a bug in the preset, it is the whole point of default-deny, but it is the thing you will
+hit first. Two practical consequences:
+
+- Claude Code's `WebFetch` runs on the machine it is on, so inside a sandbox it is subject to the
+  same policy and will fail on an arbitrary URL. `WebSearch` goes through the Anthropic API, which is
+  allowed, so searching works while fetching the results does not.
+- A blocked fetch is often silent from the agent's point of view. It falls back to memory and
+  produces confidently outdated code rather than announcing that it could not read the docs.
+
+Widen it deliberately rather than reaching for `allow-all`:
+
+```
+sbx policy ls                                  # what is actually allowed right now
+sbx policy allow network docs.python.org       # one domain
+sbx policy allow network '*.readthedocs.io'    # a wildcard
+sbx policy allow network example.com --sandbox <name>   # just this sandbox
+```
+
+The rule worth keeping: documentation and package hosts earn a place, telemetry and analytics do
+not. If you find yourself adding a dozen domains for one task, that is a signal to scope the rule to
+that sandbox rather than loosening the baseline for everything.
+
+There is a better answer than a long allowlist for documentation specifically — a doc broker such as
+Context7, or a self-hosted docs instance, puts thousands of libraries behind one allowed host. Worth
+reaching for before the allowlist grows past a screenful.
+
 ## Two secrets, two different problems
 
 The Docker token authenticates `sbx` itself and belongs in the Keychain, fetched by `secret_get` like

@@ -84,10 +84,10 @@ if with_timeout 60 "$sbx" policy init "$policy" >/dev/null 2>&1; then
 else
   die "could not set the policy preset with 'sbx policy init $policy'.
 
-This is the one command in this recipe not confirmed against a real install. Check
-'$sbx policy --help' for the right form, then fix recipes/have-agent-sandbox/apply.sh —
-see 'This project corrects itself' in CLAUDE.md. Do not work around it here: an unset
-policy means the first 'sbx run' prompts, and a prompt on a headless server hangs."
+Valid presets are allow-all, balanced and deny-all. If the command form has changed, fix
+recipes/have-agent-sandbox/apply.sh rather than working around it here — see 'This project
+corrects itself' in CLAUDE.md. An unset policy means the first 'sbx run' prompts, and a
+prompt on a headless server hangs."
 fi
 
 note "next: sbx run --clone claude   (then /login inside the sandbox, once)"

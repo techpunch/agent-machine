@@ -202,10 +202,11 @@ the coordination layer.
 
 Genuinely open:
 
-- Which `sbx` policy preset is right in practice. `balanced` is the starting point; whether ordinary
-  development works under it, or everything needs `allow-all`, is a first-run finding.
-- The exact command to set that preset non-interactively. `sbx policy init <preset>` is what the
-  recipe uses and it is not confirmed against a real install.
+- How much the `balanced` allowlist has to grow in practice. It covers AI provider APIs, package
+  managers, code hosts and registries — the agent works and dependencies install — but not
+  documentation sites, so research is denied by default. Whether that settles into a handful of
+  added domains, a doc broker, or a wider policy for research sandboxes is a first-run finding. See
+  "Research versus containment" in [`secrets-and-egress.md`](secrets-and-egress.md).
 
 Deferred by scope, with a recipe carrying its `blocked_by`: `make-data-encrypted` needs a real server
 to build against, and `have-native-apps` is server-specific by nature.

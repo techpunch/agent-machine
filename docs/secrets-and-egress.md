@@ -145,6 +145,33 @@ Verify it rather than trusting it. `have-agent-sandbox`'s verify creates a probe
 it; if you want to check egress by hand, try reaching a `100.64.x.x` address from inside one and
 watch it fail.
 
+## Research versus containment, the tension you will actually feel
+
+Default-deny and an agent that needs to read a wide, unpredictable range of documentation are in
+genuine conflict, and no configuration removes it. You cannot enumerate every site an agent might
+want, and an allowlist broad enough to cover the long tail has stopped being a firewall.
+
+The resolving idea is that the danger is not reading the web. It is having broad outbound access and
+something worth stealing in the same place at the same time. Exfiltration needs both. So aim never to
+have both at once rather than choosing between research and safety:
+
+- Keep the research and the secret-holding apart. A sandbox with a wide policy and no credentials can
+  read whatever it likes and has nothing to leak. The sandbox holding a token and a real repo runs
+  under the baseline. `sbx policy allow network ... --sandbox <name>` scopes a rule to one sandbox,
+  which is what makes this practical rather than theoretical.
+- Put one trusted endpoint in front of documentation instead of allowlisting the web. A doc broker —
+  Context7, or a self-hosted equivalent — collapses thousands of libraries into a single allowed
+  host, or none at all if you run it locally.
+- Curate rather than paste. Documentation and package hosts earn a place; telemetry and analytics do
+  not.
+
+The honest tradeoff: the cleaner you keep egress, the more research friction you accept. Nothing
+gives unrestricted reading and zero exfiltration risk together.
+
+Watch for the failure mode too. Default-deny fails quietly — a blocked agent falls back to memory and
+writes confidently outdated code rather than telling you it could not reach the docs. If output
+quality drops for no visible reason, check what is being denied before assuming the model got worse.
+
 ## Match the posture to the work
 
 The default preset is a compromise, and you can move it. `sbx policy` tightens or loosens what a
