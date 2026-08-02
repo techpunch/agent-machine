@@ -199,9 +199,9 @@ The day-to-day layer: how one person coordinates many in-flight projects without
 terminal to each one.
 
 The decision, and it is not a placeholder: a persistent tmux grid on the server, one pane per
-project, plus the native phone bridges. SSH in over Tailscale and attach to that one session; each
-pane runs `sbx run --clone <agent>`. On the phone, Claude Code Remote Control drives a specific
-session — no new infrastructure, and execution stays on the server.
+project. SSH in over Tailscale and attach to that one session; each pane runs
+`sbx run --clone <agent>`, which attaches you to the agent directly, so a pane is a session and
+there is nothing to connect to per project. From the phone it is the same command from an SSH client.
 
 Why this rather than an orchestrator. The people running this at volume — Steinberger with a 3×3
 terminal grid, Willison with a grid of plain terminals across repos — agree the bottleneck is not
@@ -209,6 +209,30 @@ spawning or coordinating agents, it is how fast you can review what they produce
 not move that needle gets discarded, and both explicitly rejected the wrapper apps for hiding what
 the model is doing. Adopt a worktree board only when reading diffs across many tasks is the thing
 that hurts. Not before.
+
+Why tmux specifically, since this category churns fast and the question keeps coming back. The
+alternatives were compared against three requirements this machine actually has, and each fails one
+structurally rather than narrowly:
+
+| | Survives disconnect | Headless server | Works with `--clone` |
+|---|---|---|---|
+| tmux | yes | yes | yes |
+| Zellij | yes | yes | Codex scrollback broken over SSH |
+| cmux, Zentty | no | no | — |
+| claude-squad, workmux, NTM | yes | yes | no — git worktrees |
+| Conductor, Nimbalyst, Vibe Kanban | no | no | — |
+
+cmux and Zentty are native macOS apps with no detach or reattach at all; both their own docs say to
+keep tmux if sessions must survive an SSH disconnect, and this server has no GUI session to render
+into. Zellij is a genuine peer — persistent, SSH-capable, better ergonomics — but has open scrollback
+defects with agent TUIs over SSH, including the Termux path, and this repo's scope covers Codex as
+well as Claude Code. The agent managers isolate work with a git worktree per agent, and `sbx` rejects
+`--clone` from anywhere but the main checkout, so their isolation mechanism and ours cannot both run;
+theirs is also the weaker one, since a worktree is not a microVM. The desktop review apps assume a
+machine you look at.
+
+So tmux stays, and it stays for a reason that will not move: the requirement doing the eliminating is
+headless-plus-SSH-plus-sbx-owns-isolation, which is the shape of this design rather than a taste.
 
 Deliberately absent: a dispatcher that takes a request from a chat app and routes it to an agent
 unattended. That is the natural next thing to want, and it is the point at which this stops being a
@@ -219,9 +243,10 @@ network-exposed daemon, and the design should be revisited rather than extended.
 
 - [Peter Steinberger — Just Talk To It](https://steipete.me/posts/just-talk-to-it)
 - [Simon Willison — Embracing the parallel coding agent lifestyle](https://simonwillison.net/tags/parallel-agents/)
-- [Claude Code — Remote Control](https://code.claude.com/docs/en/remote-control)
 - [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/) and its
   [default security posture](https://docs.docker.com/ai/sandboxes/security/defaults/)
+- [Remote Control inside sandboxes](https://github.com/docker/sbx-releases/issues/8) — why `/rc` does
+  not reach a sandboxed agent
 
 ## What is left to pin
 
@@ -235,6 +260,17 @@ Genuinely open:
   documentation sites, so research is denied by default. Whether that settles into a handful of
   added domains, a doc broker, or a wider policy for research sandboxes is a first-run finding. See
   "Research versus containment" in [`secrets-and-egress.md`](secrets-and-egress.md).
+
+Two smaller questions are open only because the answers are not published anywhere, rather than
+because the design is undecided. Both are one command on a real server:
+
+- Whether a second sandbox re-prompts for `/login` or picks the host-held credential up silently.
+  Everything about the design says silently. Docker does not say so outright in the get-started
+  guide, the credentials page, the Claude Code or Droid agent pages, the FAQ, or the release notes.
+- Whether `sbx policy init <preset>` succeeds on a fresh install with no policy to replace. It is
+  documented as the non-interactive way to set a preset, and `have-agent-sandbox` treats a failure as
+  fatal rather than a warning, because an unset policy means the first `sbx run` prompts and a prompt
+  on a headless server hangs.
 
 Deferred by scope, with a recipe carrying its `blocked_by`: `make-data-encrypted` needs a real server
 to build against, and `have-native-apps` is server-specific by nature.

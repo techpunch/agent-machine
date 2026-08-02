@@ -22,8 +22,15 @@ fi
 # Defaults chosen for watching agents rather than for editing: a long scrollback because an
 # agent can outrun the default 2000 lines in one task, and mouse mode so scrolling a pane
 # over SSH does not mean learning copy-mode first.
+#
+# The terminal settings are not cosmetic. An SSH session that leaves TERM as xterm makes Claude
+# Code's renderer degrade: box-drawing falls back to ASCII, colour drops to 8, and slash-command
+# autocomplete renders as plain text above the prompt instead of inline. Since SSH is the only way
+# anyone reaches this grid, that is the default experience unless we set it here.
 cat >"$HOME/.tmux.conf" <<'CONF'
 # Managed by the agent-machine cookbook (recipes/have-coordination). Edits are overwritten.
+set -g default-terminal "tmux-256color"
+set -ga terminal-overrides ",*256col*:Tc"
 set -g history-limit 100000
 set -g mouse on
 set -g base-index 1
