@@ -20,11 +20,11 @@ sbx run --clone claude        # in a pane: one project, in its own sandbox
 
 ## Why the grid is on the host now
 
-It used to live inside the VM, because the VM was where agents ran. With `sbx` each agent gets its own
-microVM per invocation, so there is no long-lived guest to hold the session — and putting the grid
-inside a disposable sandbox would defeat the point of it outlasting your connection.
+It used to live inside the VM, because the VM was the one long-lived guest everything ran in. With
+`sbx` there is no single guest — each project gets its own sandbox — so a grid inside any one of them
+would only see that project, and would vanish with it.
 
-So the grid runs on the Mac and each pane starts a sandbox. That is simpler in a way worth noting:
+So the grid runs on the Mac and each pane attaches to a sandbox. That is simpler in a way worth noting:
 this recipe no longer depends on the agent layer at all. It requires only Homebrew, which means the
 terminal grid works whether or not you have got as far as installing `sbx`.
 
