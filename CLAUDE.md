@@ -32,8 +32,8 @@ How to work when you hit one:
 - Diagnose before you change. Read what actually happened — `./bin/cookbook log`, the verify output,
   the failing command run by hand. An error message is a starting point, not a cause.
 - Experiment freely while you are still learning how something behaves. Change a script, run it, read
-  the result, change it again. Poking at it is often the only way to find out what macOS or Colima
-  really does, and that is fine.
+  the result, change it again. Poking at it is often the only way to find out what macOS or a
+  third-party tool really does, and that is fine.
 - Then land a real fix. Exploratory edits are not the deliverable. Once you understand the cause,
   make the smallest change that addresses it, re-run verify to prove it, and remove anything you
   added only to learn with.
@@ -63,11 +63,11 @@ pending.
 ## Yolo mode on the host is for this repo only
 
 Running with permissions skipped on the host Mac is justified for cookbook work and nothing else. If
-asked to work on any other project from a host session, say so and move the work into the agent VM
-(`colima ssh --profile agent`, throwaway clone) rather than doing it on the host. Do not make an
+asked to work on any other project from a host session, say so and move the work into a sandbox
+(`sbx run --clone`) rather than doing it on the host. Do not make an
 exception because a change looks small — that exception is how the boundary stops existing.
 
-The full argument, and the rule about what may live in the VM, is in `docs/secrets-and-egress.md`.
+The full argument, and the rule about what may live in a sandbox, is in `docs/secrets-and-egress.md`.
 That file is the single source for it; do not restate it elsewhere.
 
 ## Layout

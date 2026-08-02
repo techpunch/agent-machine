@@ -8,7 +8,7 @@ gates: the admin user's password, or the System Settings toggle
 ---
 
 The step that makes a reboot survivable with nobody in the room. Agents, LaunchAgents, and the
-Colima VM all run in a logged-in GUI session, so a server sitting at the login window after a power cut
+the tmux grid all run in a logged-in GUI session, so a server sitting at the login window after a power cut
 is a server that is down until someone connects to it.
 
 FileVault and auto-login are mutually exclusive, and this recipe treats that as a decision rather

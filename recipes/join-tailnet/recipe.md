@@ -31,8 +31,8 @@ A tagged node is owned by the tailnet rather than by a user and has key expiry d
 why the server stays connected across reboots instead of dropping off in 90 days.
 
 The `tag:host` tag, its owner, and the reusable key are shared setup done once — see
-`docs/shared-setup.md`. The host is the only tailnet node on the server: the agent VM deliberately
-stays off the tailnet, since `make-vm-network-bounded` denies the tailnet range from inside it.
+`docs/shared-setup.md`. The host is the only tailnet node on the server: agent sandboxes cannot
+reach the tailnet at all, since their egress policy blocks private ranges outright.
 
 Verify records `TS_IP` into `server.env` when it finds the server connected, so later recipes and you
 have it without a lookup. That IP is what used to live in an inventory table.

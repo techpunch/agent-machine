@@ -55,7 +55,7 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
 
 7. Finish with what they can now do, in commands rather than concepts. The two that matter
    day to day live inside the VM: `agents` to attach to the terminal grid, and
-   `agent-run <dir>` to put one project in its own container. Then two things they will
+   `sbx run --clone claude` to put one project in its own sandbox. Then two things they will
    need later and will not think to ask about:
 
    - The run log, at `~/.agent-machine/run.log` — every action, gate and failure, with
@@ -75,11 +75,11 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
      - What is applied, from the ledger.
      - How to revoke, which is what they will want when they cannot reach the machine at all:
        remove the node in the Tailscale admin console, sign out everywhere from the Claude
-       account to kill the token in the VM, and rotate the reusable auth key so a stolen
+       account to kill the token in the sandbox, and rotate the reusable auth key so a stolen
        machine cannot rejoin.
 
      Say where to put it: their password manager, or a private note on the laptop or phone
-     they already use as a client. Not in this repo, and never inside the agent VM, where
+     they already use as a client. Not in this repo, and never inside an agent sandbox, where
      anything can leave.
 
 ## Timing is the point

@@ -22,7 +22,7 @@ writes the ledger and the log:
 ```
 
 Goals and recipe names are interchangeable as arguments — `apply run-agents` and
-`apply have-vm-claude-code` both work. Goals are the human-facing names, and several can be given at
+`apply have-agent-sandbox` both work. Goals are the human-facing names, and several can be given at
 once: they resolve into one correctly-ordered run rather than several overlapping ones.
 
 Three narrower slash commands sit alongside `/setup`: `/cookbook` runs status and explains it,

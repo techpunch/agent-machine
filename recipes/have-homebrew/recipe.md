@@ -6,7 +6,7 @@ root: no
 gates: none
 ---
 
-The package prerequisite under everything installed later — Tailscale, Colima, agent tooling.
+The package prerequisite under everything installed later — Tailscale, sbx, tmux.
 
 Runs the official install script non-interactively (`NONINTERACTIVE=1`, so it doesn't stop to ask
 for a keypress on a headless server) and appends the `brew shellenv` line to the admin user's

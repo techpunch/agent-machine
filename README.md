@@ -49,8 +49,7 @@ finished step is a no-op.
 | Keep running unattended | Never sleeps, comes back by itself after a power cut |
 | Run with no monitor or keyboard | Proves reboot survival first, then you unplug |
 | Route your traffic through it | Use it as a Tailscale exit node on untrusted wifi |
-| Run coding agents on it | An isolated Linux VM with Claude Code signed in |
-| Keep projects apart | WIP - A container per project, so untrusted code can't reach the rest |
+| Run coding agents on it | WIP - A microVM per agent, egress under policy, nothing shared with the Mac |
 | Drive many projects at once | WIP - A persistent terminal grid you attach to from anywhere |
 
 ## Keep a copy of the details off the server
@@ -63,7 +62,7 @@ But all three are on the box you would be trying to rebuild. Keep a human copy s
 machine's name and Tailscale IP, the admin user, whether FileVault is off, which password-manager
 entry holds your tailnet key — pointers, never the secrets themselves — and how to revoke everything
 if the Mac is stolen. `/setup` offers to print it for you at the end. Put it in your password manager
-or a note on your laptop; not in this repo, and never in the agent VM.
+or a note on your laptop; not in this repo, and never inside an agent sandbox.
 
 ## More
 
@@ -71,7 +70,7 @@ In case you're curious to know more about how it works and the internals:
 
 - [`docs/running-the-cookbook.md`](docs/running-the-cookbook.md) — driving it yourself without
   `/setup`, and reading the records it leaves behind.
-- [`docs/secrets-and-egress.md`](docs/secrets-and-egress.md) — what may live in the VM, and why yolo
+- [`docs/secrets-and-egress.md`](docs/secrets-and-egress.md) — what may live in a sandbox, and why yolo
   mode on the Mac itself is only for this repo. Read before putting a project in there.
 - [`docs/pushing-agent-code.md`](docs/pushing-agent-code.md) — getting the agent's work out of the VM
   and pushed, without a credential that can reach your real branches.

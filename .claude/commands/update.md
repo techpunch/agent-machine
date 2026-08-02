@@ -17,15 +17,11 @@ Then offer to apply, and be specific about consequence, because these are not eq
 
 - `brew upgrade` — usually safe, occasionally breaks a formula something else depends on.
   Say how many packages. On a server running agents, take it.
-- `apt-get upgrade` in the VM — safe, and the VM is disposable, so this is the easiest yes.
-- Rebuilding the agent image (`apply have-containers`) — how the base image's security
-  updates actually reach the container. An image more than a month old is worth rebuilding
-  even with no other reason. Nothing is lost: credentials live on volumes, not in the image.
+- Stale sandboxes (`sbx ls`, then `sbx rm <name>`) — they cost disk and hold nothing you
+  need once the work has been fetched out.
 - macOS updates — these reboot the machine. Fine on a server that has proved it comes back
   unattended, and `make-headless` is exactly that proof. Confirm before triggering, tell the
   user it will drop the connection, and say roughly how long before it is reachable again.
-- A VM reboot when `/var/run/reboot-required` exists — kills anything running in the VM, so
-  check whether the user has agents mid-task first.
 
 Do not batch these into one silent sweep. Apply, confirm each worked, and say what changed.
 
@@ -34,13 +30,12 @@ Do not batch these into one silent sweep. Apply, confirm each worked, and say wh
 Everything under `== needs judgment` is a question about the world, so research it. This part
 produces a commit, not a patched machine, and the fix reaches every server that pulls the repo.
 
-- The base image codename. Find out whether it is still Debian's current stable and still in
-  full security support, not LTS. A codename does not follow Debian forward, so this goes
-  stale silently — it already did once, which is why the check exists. If it has moved, edit
-  `recipes/have-containers/Dockerfile`, update the dates in the comment beside `FROM`, and
-  fix the supply-chain table in `docs/host-agent-design.md`.
-- Colima, Tailscale, Claude Code. Look for releases that fix something worth having, and for
-  advisories. A newer version for its own sake is not a reason; a fix is.
+- The `sbx` network policy preset. Is the recorded `SBX_POLICY` still the right posture for
+  what actually runs on this box? Tightening it is cheap; discovering it was too loose is not.
+- `sbx` itself. It is proprietary and free at time of writing — check that both are still
+  true, and look for releases that fix something worth having. A newer version for its own
+  sake is not a reason; a fix is.
+- Tailscale and Claude Code. Same question, plus any advisories.
 - The blocked recipes. Read each `blocked_by` and ask whether it is still true. This is the
   one that rots quietest: a recipe deferred because "nothing needs it today" stays deferred
   long after something does. If a reason has expired, say so and propose unblocking.

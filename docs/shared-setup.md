@@ -28,8 +28,8 @@ hardcoding them. Filling this block in is what makes a copy of the cookbook your
 - [ ] Shared account — one account the agents sign in to, rather than one per server. Password and
       2FA recovery codes go in the password manager.
 - [ ] Tailscale tailnet — clients and servers all join the same tailnet, which can live under any
-      account. Each server puts its macOS host on the tailnet; the agent VM deliberately stays off it,
-      so there is one node per server, not two.
+      account. Each server puts its macOS host on the tailnet; agent sandboxes have no tailnet access at
+      all, so there is one node per server.
       - In the admin console, define a tag in the ACL policy with yourself as tag owner: `tag:host`
         for the macOS hosts, e.g. `"tagOwners": { "tag:host": ["<your-account>"] }`.
       - Generate one reusable, non-ephemeral, pre-approved auth key for it (Settings → Keys). A
@@ -42,7 +42,7 @@ hardcoding them. Filling this block in is what makes a copy of the cookbook your
       - Tailnet name / org: `<FILL IN>`
       - Reusable `tag:host` auth key — stored at: `<FILL IN>`
 - [ ] Agent accounts and keys — set up once, servers authenticate against them. A server runs one or
-      more of these; `have-agent-auth` is the recipe that signs them in.
+      more of these; you sign in with `/login` inside a sandbox on first use.
       - Claude Code (Anthropic) — subscription login or `ANTHROPIC_API_KEY`: `<FILL IN>`
       - Codex (OpenAI) — ChatGPT plan or `OPENAI_API_KEY`: `<FILL IN>`
 
