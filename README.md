@@ -1,24 +1,24 @@
 # agent-machine
 
-Turn a spare Mac into an always-on server that runs coding agents, reachable from your laptop and
-phone over Tailscale, with the agents sandboxed in a Linux VM so they can run in YOLO mode
-("skip all permission prompts") safer.
+Turn a spare Mac into an always-on server that runs coding agents, optionally running headless,
+reachable from any device on your tailnet, with the agents sandboxed in a Linux VM so they can run
+in YOLO mode ("skip all permission prompts") safer.
 
-WARNING: this project is suggested to be run with `claude --dangerously-skip-permissions`. It also
-suggests that you turn off FileVault encryption if you want your server to auto restart. You shouldn't
-proceed unless you understand the associated risks of these suggestions.
+WARNING: this project is suggested to be run with `claude --dangerously-skip-permissions`. It
+also suggests that you turn off FileVault encryption if you want your server to auto restart.
+You shouldn't proceed unless you understand the associated risks of these suggestions.
 
 ## Get it running
 
-On your spare Mac with a monitor and keyboard still attached (have a cheap HDMI dummy dongle on
-hand or on order too if you plan to run 24/7 headless):
+On your spare Mac with a monitor and keyboard (have a cheap HDMI dummy dongle on hand or on order
+too if you plan to run 24/7 headless):
 
 ```
-git clone <this repo> ~/agent-machine && cd ~/agent-machine
+git clone https://github.com/techpunch/agent-machine.git ~/agent-machine && cd ~/agent-machine
 claude --dangerously-skip-permissions
 ```
 
-Then tell claude `/setup`
+Then in claude run `/setup`:
 
 ![Typing /setup in Claude Code, showing the command described as "Set this Mac up as an agent server, start to finish, with no docs to read"](docs/images/setup-command.png)
 
@@ -27,14 +27,13 @@ things it cannot do for you, and does the rest.
 
 You can stop reading now if you'd like and just do it.
 
-## What `/setup` is like
+## What `/setup` does
 
-It is a conversation, not a manual. It asks which outcomes you want — pick as many as you like — then
-works out everything that follows from them.
+It's a conversation that asks which outcomes you want, then automagically does as much of
+the work for you as it can, prompting to do the things it can't do.
 
-Before it starts, it tells you what it needs from you and nothing more: a Tailscale key, your admin
-password, an HDMI dummy plug if you want the machine headless. It installs everything else for you,
-and stops to talk whenever it needs you.
+Before it starts, it tells you what it needs from you: a Tailscale key, your admin
+password set up, an HDMI dummy plug if you want the machine headless.
 
 It proves the server survives a reboot untouched *before* it tells you it is safe to unplug the
 keyboard and swap the monitor for the dongle.
@@ -67,6 +66,8 @@ if the Mac is stolen. `/setup` offers to print it for you at the end. Put it in 
 or a note on your laptop; not in this repo, and never in the agent VM.
 
 ## More
+
+In case you're curious to know more about how it works and the internals:
 
 - [`docs/running-the-cookbook.md`](docs/running-the-cookbook.md) — driving it yourself without
   `/setup`, and reading the records it leaves behind.
