@@ -1,12 +1,15 @@
 # agent-machine
 
 Turn a spare Mac into an always-on server that runs coding agents, optionally running headless,
-reachable from any device on your tailnet, with the agents sandboxed in a Linux VM so they can run
-in YOLO mode ("skip all permission prompts") safer.
+reachable from any device on your tailnet, with each agent sandboxed in its own microVM so they can
+run in YOLO mode ("skip all permission prompts") safer.
 
 WARNING: this project is suggested to be run with `claude --dangerously-skip-permissions`. It
 also suggests that you turn off FileVault encryption if you want your server to auto restart.
 You shouldn't proceed unless you understand the associated risks of these suggestions.
+
+Agent isolation uses [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/), which is
+proprietary and needs a free Docker account. The host layer does not depend on it.
 
 ## Get it running
 
@@ -32,8 +35,10 @@ You can stop reading now if you'd like and just do it.
 
 It's a conversation that gets you to your end goal machine state as quickly as possible.
 
-Before it starts, it tells you what it needs from you: a Tailscale key, your admin
-password set up, an HDMI dummy plug if you want the machine headless.
+Before it starts, it tells you what it needs from you, and only what it needs given what you
+picked — a Tailscale key, your admin password, a Docker account for the agent sandboxes, a Claude
+subscription, an HDMI dummy plug if you want the machine headless. It installs everything else
+itself.
 
 It proves the server survives a reboot untouched *before* it tells you it is safe to unplug the
 keyboard and swap the monitor for the dongle.
@@ -72,14 +77,14 @@ In case you're curious to know more about how it works and the internals:
   `/setup`, and reading the records it leaves behind.
 - [`docs/secrets-and-egress.md`](docs/secrets-and-egress.md) — what may live in a sandbox, and why yolo
   mode on the Mac itself is only for this repo. Read before putting a project in there.
-- [`docs/pushing-agent-code.md`](docs/pushing-agent-code.md) — getting the agent's work out of the VM
-  and pushed, without a credential that can reach your real branches.
-- [`docs/host-agent-design.md`](docs/host-agent-design.md) — why the host and the VM are separate.
+- [`docs/pushing-agent-code.md`](docs/pushing-agent-code.md) — getting the agent's work out of a
+  sandbox and pushed, without a credential that can reach your real branches.
+- [`docs/host-agent-design.md`](docs/host-agent-design.md) — why the host and the agents are separate.
 - [`docs/shared-setup.md`](docs/shared-setup.md) — accounts and tailnet, once before the first server.
 - [`CLAUDE.md`](CLAUDE.md) — repo layout and how to write a recipe.
 
-Not built yet: signing Codex in alongside Claude Code, default-deny egress for proprietary work, and
-encryption at rest. Each carries a contract in `recipes/` explaining what it is waiting on.
+Not built yet: encryption at rest that survives an unattended reboot. It carries a contract in
+`recipes/make-data-encrypted/` explaining what it is waiting on.
 
 ## License
 

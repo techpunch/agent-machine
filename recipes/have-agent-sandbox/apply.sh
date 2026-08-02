@@ -20,52 +20,74 @@ else
   ok "installed $sbx"
 fi
 
-# Already signed in? `sbx login` is not idempotent in the useful sense — it would re-prompt — so
-# check first and only authenticate when we have to.
-if with_timeout 30 "$sbx" whoami >/dev/null 2>&1; then
-  ok "already signed in to Docker as $(with_timeout 30 "$sbx" whoami 2>/dev/null | /usr/bin/tr -d '\r')"
+# `sbx login` would re-prompt, so check first and only authenticate when we have to. One call,
+# not two: each one can take the full timeout if the daemon is unhappy.
+who=$(with_timeout 30 "$sbx" whoami 2>/dev/null | /usr/bin/tr -d '\r' || true)
+if [ -n "$who" ]; then
+  ok "already signed in to Docker as $who"
 else
+  # The username is config, not a secret — it goes in server.env like SERVER_NAME. Only the
+  # token is Keychain material. Conflating the two would mean a username you cannot read back
+  # without unlocking a keychain, for no benefit.
+  if [ -z "${DOCKER_USER:-}" ]; then
+    gate "have-agent-sandbox needs your Docker account, in two parts.
+
+1. Your Docker username. Not a secret, so pass it once and it is recorded in server.env:
+
+     DOCKER_USER=<your-docker-id> ./bin/cookbook apply have-agent-sandbox
+
+2. A personal access token, which is a secret. Create one at
+   https://app.docker.com/settings/personal-access-tokens — Read scope is enough, since sbx
+   only needs to authenticate, not publish.
+
+   Store it in the Keychain as the admin user (not with sudo). The command takes no value —
+   it prompts, so the token never reaches your shell history or ps:
+
+     $(secret_store_hint DOCKER_PAT)
+
+Do both, then re-run the command in step 1. Stored once, later servers reuse the token."
+  fi
+  set_server_var DOCKER_USER "$DOCKER_USER"
+
   if ! secret_get DOCKER_PAT; then
     gate "have-agent-sandbox needs a Docker personal access token to sign sbx in.
 
-Create one at https://app.docker.com/settings/personal-access-tokens
-  Scope: Read is enough. sbx only needs to authenticate, not publish.
+Create one at https://app.docker.com/settings/personal-access-tokens — Read scope is enough.
+Then store it in the Keychain, as the admin user (not with sudo):
 
-Then store it in the Keychain, as the admin user (not with sudo). The command takes no
-value — it prompts, so the token never lands in your shell history or in ps:
   $(secret_store_hint DOCKER_PAT)
-
-You will also need your Docker account username. Set it once:
-  ./bin/cookbook apply have-agent-sandbox   # after storing DOCKER_USER below
-
-  security add-generic-password -s $SECRET_SERVICE -a DOCKER_USER -T /usr/bin/security -U -w
 
 Then re-run:
   ./bin/cookbook apply have-agent-sandbox"
   fi
 
-  secret_get DOCKER_USER || die "DOCKER_USER not found — store your Docker username the same way as the token"
-
   # --password-stdin keeps the token out of argv, where any local user could read it from ps.
-  # This is also what makes the login work with no browser, which a headless server has none of.
+  # It is also what makes the login work with no browser, which a headless server has none of.
   printf '%s' "$DOCKER_PAT" | with_timeout 120 "$sbx" login --username "$DOCKER_USER" --password-stdin \
-    || die "sbx login failed — check the token is valid and has Read scope"
+    || { unset DOCKER_PAT; die "sbx login failed — check the token is valid and has Read scope"; }
   unset DOCKER_PAT
   ok "signed in to Docker as $DOCKER_USER"
 fi
 
-# The network policy. Left unset, the first `sbx run` prompts interactively for a preset, which on a
-# server with nobody at the screen would hang rather than fail. Set it here instead.
+# The network policy is the whole security posture, and it is also what stops the first `sbx run`
+# prompting for a preset — a prompt on a server with nobody at the screen hangs rather than fails.
+# So a failure here is a failure, not a warning: carrying on would leave a machine that looks set up
+# and then stalls the first time somebody uses it.
+#
+# Do not gate this on `policy ls` succeeding first. On a fresh install there may be no policy to
+# list, which is exactly when setting one matters most.
 policy="${SBX_POLICY:-balanced}"
-if with_timeout 30 "$sbx" policy ls >/dev/null 2>&1; then
-  note "applying network policy preset: $policy"
-  # The exact subcommand is the one thing here not confirmed against a real install. If this is
-  # wrong, the error will say so — fix it here rather than working around it at the call site.
-  with_timeout 60 "$sbx" policy init "$policy" >/dev/null 2>&1 \
-    || note "could not set the preset with 'sbx policy init $policy' — check 'sbx policy --help' and fix this recipe"
+note "setting network policy preset: $policy"
+if with_timeout 60 "$sbx" policy init "$policy" >/dev/null 2>&1; then
+  set_server_var SBX_POLICY "$policy"
+  ok "network policy preset: $policy"
 else
-  note "sbx policy is not answering; the preset has not been set"
+  die "could not set the policy preset with 'sbx policy init $policy'.
+
+This is the one command in this recipe not confirmed against a real install. Check
+'$sbx policy --help' for the right form, then fix recipes/have-agent-sandbox/apply.sh —
+see 'This project corrects itself' in CLAUDE.md. Do not work around it here: an unset
+policy means the first 'sbx run' prompts, and a prompt on a headless server hangs."
 fi
-set_server_var SBX_POLICY "$policy"
 
 note "next: sbx run --clone claude   (then /login inside the sandbox, once)"

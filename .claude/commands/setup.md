@@ -54,7 +54,7 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
      never echo it back.
 
 7. Finish with what they can now do, in commands rather than concepts. The two that matter
-   day to day live inside the VM: `agents` to attach to the terminal grid, and
+   day to day are on the server: `agents` to attach to the terminal grid, and
    `sbx run --clone claude` to put one project in its own sandbox. Then two things they will
    need later and will not think to ask about:
 

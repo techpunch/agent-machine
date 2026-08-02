@@ -13,6 +13,7 @@ fi
 who=$(with_timeout 30 "$sbx" whoami 2>/dev/null | /usr/bin/tr -d '\r')
 if [ -n "$who" ]; then
   ok "signed in to Docker as $who"
+  [ -n "${DOCKER_USER:-}" ] || miss "DOCKER_USER not recorded in server.env — run apply so a rebuild knows which account"
 else
   miss "not signed in — apply will gate for a Docker personal access token"
   verify_result

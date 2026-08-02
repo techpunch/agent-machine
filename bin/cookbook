@@ -30,7 +30,7 @@ PREREQS_DIR="$COOKBOOK_DIR/prereqs"
 # Secrets reach a root recipe as `sudo VAR=value ...`, so they never land in server.env.
 # This is the escape hatch, not the default — it is visible in ps for the life of the
 # command. The default is the Keychain, via secret_get in lib/common.sh.
-PASSTHROUGH="AGENT_MACHINE_STATE_DIR TS_AUTHKEY ADMIN_PASSWORD SERVER_NAME FILEVAULT_POLICY HEADLESS_CONFIRMED"
+PASSTHROUGH="AGENT_MACHINE_STATE_DIR TS_AUTHKEY ADMIN_PASSWORD DOCKER_USER SERVER_NAME FILEVAULT_POLICY HEADLESS_CONFIRMED"
 
 # ---- recipe metadata --------------------------------------------------------
 
