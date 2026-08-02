@@ -22,10 +22,14 @@ remain your problem.
 ## Day to day
 
 ```
-sbx run --clone --kit recipes/have-agent-sandbox/kit claude
-git fetch sandbox-<name>          # bring the work back, on the host
-sbx rm <name>                     # done with it
+sbx run --clone --kit recipes/have-agent-sandbox/kit --name <project> claude
+git fetch sandbox-<project>       # bring the work back, on the host
 ```
+
+Sandboxes are long-lived and reusable, not per-invocation. Running again in the same workspace — or
+with the same `--name` from anywhere — reattaches to the existing one, and installed packages,
+config and command history survive stops and restarts. So the shape that works is one sandbox per
+project, kept.
 
 `--clone` matters. The default mounts your working tree read-write, and an agent that can write
 `.git/config` in a directory you later run git in has a path to executing commands on your Mac — see
@@ -118,14 +122,14 @@ reaching for before the allowlist grows past a screenful.
 The Docker token authenticates `sbx` itself and belongs in the Keychain, fetched by `secret_get` like
 the tailnet key. Read scope is enough. It never reaches `server.env` and never appears in argv.
 
-The agent's own sign-in happens inside a sandbox with `/login` — and it is **per sandbox**. There is
-no home directory shared between sandboxes, so a new one means signing in again. That is the main
-friction in this setup and it is worth knowing before you meet it.
+The agent's own sign-in happens inside a sandbox with `/login`, once per sandbox. Since sandboxes are
+long-lived and reattach, that is once per project in practice — not per session, and not per task.
 
-The alternative is an API key held as an `sbx` secret and injected by the proxy, which every sandbox
-picks up automatically and which the agent never sees in raw form. It trades your subscription for
-metered billing, so it is a real choice rather than an obvious upgrade: take the subscription and the
-repeated login for occasional work, take the key if you are starting sandboxes all day.
+The cost only bites if you tear sandboxes down often, because `sbx rm` takes the sign-in with it.
+If you find yourself doing that — many short-lived one-shot runs, say — the alternative is an API key
+held as an `sbx` secret and injected by the proxy, which every sandbox picks up automatically and
+which the agent never sees in raw form. It trades the subscription for metered billing, so it is a
+real choice rather than an obvious upgrade.
 
 ## What this buys, and what it costs
 

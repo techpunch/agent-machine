@@ -41,7 +41,7 @@ Mac (<server>) — macOS, FileVault off, auto-login
 │   ├─ tmux grid — one pane per project, survives you detaching
 │   │
 │   └─ sbx (Docker Sandboxes)
-│        └─ one microVM per agent invocation
+│        └─ one long-lived microVM per project
 │             • own filesystem, own Docker daemon, own network
 │             • all egress through a host-side proxy under policy
 │             • --clone: read-only view of the repo, work fetched back out
@@ -116,16 +116,15 @@ Two of them, and "where is my sign-in" has two answers.
 | Where | Path | Signed in |
 |---|---|---|
 | Host Mac | the admin user's `~/.claude` | for cookbook work only |
-| Sandbox | inside the microVM | `/login`, once **per sandbox** |
+| Sandbox | inside the microVM | `/login`, once per sandbox |
 
 The host one is the session you run `/setup` from and it never touches the other. That is not just
 isolation, it is literal: sandboxes inherit nothing from the host's `~/.claude`, and they share no
-home directory with each other either. A new sandbox is a new sign-in.
+home directory with each other either.
 
-That is the sharpest friction in this design. The way out is an API key held as an `sbx` secret and
-injected by the host proxy — every sandbox gets it, the agent never sees the raw value — at the cost
-of metered billing instead of a subscription. Worth choosing deliberately rather than discovering on
-the fifth login.
+In practice that means one sign-in per project, because sandboxes are long-lived — reattaching to an
+existing one is the normal case, and state inside survives stops and restarts. Only destroying a
+sandbox costs you the login again.
 
 It is also why per-sandbox defaults come from a kit rather than a dotfile: a committed `spec.yaml`
 travels with the repo, where a host-side config would not reach the sandbox at all.
@@ -145,8 +144,8 @@ A reboot has to bring everything back unattended, in one sequence:
 2. The host session starts the native apps and Tailscale connects, re-advertising the exit node.
 3. That is all that needs to happen automatically.
 
-Agent sandboxes are deliberately not restored. They are per-invocation and disposable, and
-auto-starting them would mean auto-starting agent runs. The posture is to bring the machine back
+Agent sandboxes are deliberately not restarted. They persist as objects, but bringing them up
+automatically would mean auto-starting agent runs. The posture is to bring the machine back
 unattended but launch agent work by hand. What has to survive a reboot is the machine and the work —
 and the work survives because it is pushed or fetched out of a sandbox, not because the sandbox
 persists. See [`pushing-agent-code.md`](pushing-agent-code.md).

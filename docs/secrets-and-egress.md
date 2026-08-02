@@ -187,13 +187,16 @@ is "what can this task afford to lose".
 ## Working shape
 
 ```
-sbx run --clone claude        # a sandbox on a clone of the current repo
-git fetch sandbox-<name>      # bring the work back, on the host
-sbx rm <name>                 # done with it
+sbx run --clone --name <project> claude   # reattaches if it already exists
+git fetch sandbox-<project>               # bring the work back, on the host
 ```
 
-Destroy the sandbox when the task is done. Persistence is not a feature here — a fresh sandbox per
-task is what keeps it boring to compromise.
+Sandboxes are long-lived, so the normal shape is one per project, kept and reattached to. That is
+also where the sign-in lives, so tearing one down costs you a `/login`.
+
+Destroy one deliberately rather than habitually. Worth doing after work you did not trust, or when
+you want a known-clean starting point — a sandbox that has been running untrusted code for a month
+has accumulated whatever that code left behind. Not worth doing after every task.
 
 
 ## Getting code back out
