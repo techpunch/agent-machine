@@ -37,6 +37,16 @@ project, kept.
 With `--clone` the sandbox gets its own clone and you retrieve work by fetching, which lands objects
 in a repository whose config you control.
 
+What `--clone` does not do is limit what the sandbox can read. Your host folder is also mounted
+read-only at `/run/sandbox/source`, and that is the whole folder, not the tracked files — an
+untracked `.env` or `.envrc.private` sitting beside your source goes in with it. This was reported
+and closed as intended behaviour, so treat it as permanent. `--clone` protects the write direction
+only; keeping secrets out of the directory is still your job.
+
+Sandbox disks default to 20 GB, which a large monorepo plus a dependency tree can reach.
+`DOCKER_SANDBOXES_ROOT_SIZE=40g sbx run ...` raises it, and `DOCKER_SANDBOXES_DOCKER_SIZE` covers the
+separate Docker data disk.
+
 ## The network policy
 
 Set once and recorded as `SBX_POLICY`. `balanced` is the default here.
@@ -90,6 +100,11 @@ allowlist and the guidance are reviewable in this repo instead of living in one 
 policy store. Kits cannot write the memory file directly, since sandboxes seed that path during
 setup and would overwrite it, so the guidance goes through `agentContext`, which appends to it.
 
+Loading it from a path in this repo is fine. Remote kit sources are allowlisted to Docker Hub by
+default under `kit.allowedSources`, but local directories are governed separately by
+`kit.allowLocalKits`, which defaults to true. While editing the kit, `sbx kit add <sandbox> <path>`
+applies it to a running sandbox and restarts it without losing state.
+
 ## Making a denial loud
 
 A blocked request is not silent at the wire — the proxy returns:
@@ -122,14 +137,22 @@ reaching for before the allowlist grows past a screenful.
 The Docker token authenticates `sbx` itself and belongs in the Keychain, fetched by `secret_get` like
 the tailnet key. Read scope is enough. It never reaches `server.env` and never appears in argv.
 
-The agent's own sign-in happens inside a sandbox with `/login`, once per sandbox. Since sandboxes are
-long-lived and reattach, that is once per project in practice — not per session, and not per task.
+The agent's own sign-in happens inside a sandbox with `/login`, and it is once — not once per
+sandbox. The token it produces is stored on the host and injected into outbound requests by the
+proxy, so it is never written inside a sandbox, the agent cannot read or exfiltrate it, and later
+sandboxes are authenticated without signing in again. Destroying a sandbox does not cost you the
+login.
 
-The cost only bites if you tear sandboxes down often, because `sbx rm` takes the sign-in with it.
-If you find yourself doing that — many short-lived one-shot runs, say — the alternative is an API key
-held as an `sbx` secret and injected by the proxy, which every sandbox picks up automatically and
-which the agent never sees in raw form. It trades the subscription for metered billing, so it is a
-real choice rather than an obvious upgrade.
+An API key held as an `sbx` secret is the alternative, and there is no reason to reach for it here.
+It is injected the same way, so it buys no isolation the subscription does not already have, and it
+trades a flat subscription for metered billing. Use it only if you have a reason unrelated to this
+machine.
+
+One thing the published docs do not settle: whether a second sandbox re-prompts for `/login` or picks
+the credential up silently. Everything about the design says silently — the token is host-side and
+`sbx secret ls` lists OAuth entries alongside stored secrets — but Docker does not say so outright in
+the get-started guide, the credentials page, the Claude Code or Droid agent pages, the FAQ, or the
+release notes. Confirm it with a second sandbox on the first real server and fix this paragraph.
 
 ## What this buys, and what it costs
 

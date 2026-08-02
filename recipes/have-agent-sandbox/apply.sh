@@ -101,4 +101,5 @@ kit="$COOKBOOK_KIT"
 
 note "next, in a project directory:"
 note "  sbx run --clone --kit $COOKBOOK_KIT claude"
-note "then /login inside the sandbox — once per sandbox, since sandboxes share no home directory"
+note "then /login inside the sandbox — once, not once per project: the token is held on the host"
+note "and injected by the proxy, so later sandboxes are authenticated without signing in again"

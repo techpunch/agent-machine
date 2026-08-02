@@ -17,7 +17,15 @@ A single Mac that does two unrelated jobs at once, without letting the second en
    or a bad dependency could turn an agent into an attacker.
 
 The shape that satisfies both: a trusted host user owns the native apps and Tailscale, and agents run
-in disposable microVMs that own nothing. The microVM is the security boundary.
+in microVMs that own nothing. The microVM is the security boundary.
+
+Two priorities shape the rest, and they are worth stating because they rule things out. The pivot
+this design cares about most is the tailnet: the server is itself a node, so an agent that gets
+network reach would inherit a path to your laptop and everything else on it, which is why egress
+being blocked at the network layer matters more here than on an ordinary dev box. And running on a
+Claude subscription rather than an API key is a first-class requirement, not a preference — a setup
+that is annoying to sign in to is one you stop using, and the friction would be paid on every
+project forever.
 
 ## Architecture
 
@@ -116,15 +124,20 @@ Two of them, and "where is my sign-in" has two answers.
 | Where | Path | Signed in |
 |---|---|---|
 | Host Mac | the admin user's `~/.claude` | for cookbook work only |
-| Sandbox | inside the microVM | `/login`, once per sandbox |
+| Sandbox | inside the microVM | `/login`, once, from any sandbox |
 
 The host one is the session you run `/setup` from and it never touches the other. That is not just
 isolation, it is literal: sandboxes inherit nothing from the host's `~/.claude`, and they share no
 home directory with each other either.
 
-In practice that means one sign-in per project, because sandboxes are long-lived — reattaching to an
-existing one is the normal case, and state inside survives stops and restarts. Only destroying a
-sandbox costs you the login again.
+The sign-in is the exception, and it goes the other way from what you would expect. `/login` is typed
+inside a sandbox, but the resulting session token is stored on the host and injected into outbound
+requests by the proxy — it is never written inside the sandbox at all. So the agent can make
+authenticated calls and cannot read, log or exfiltrate the credential, and every later sandbox is
+authenticated without signing in again.
+
+That is what makes the subscription the recommended path rather than an API key. It is less work and
+less exposure at the same time, which is rare enough to say plainly.
 
 It is also why per-sandbox defaults come from a kit rather than a dotfile: a committed `spec.yaml`
 travels with the repo, where a host-side config would not reach the sandbox at all.
@@ -132,9 +145,18 @@ travels with the repo, where a host-side config would not reach the sandbox at a
 ## Trust boundaries, in order
 
 1. Host vs sandbox (the hypervisor): protects the native apps, host files, Keychain and host
-   localhost services from the agents. This is the load-bearing boundary.
-2. Sandbox vs sandbox: each invocation gets its own microVM and network, so an untrusted project
-   cannot reach another project's files or listening ports.
+   localhost services from the agents. This is the load-bearing boundary, and the only one this
+   design would pay anything to keep.
+2. Sandbox vs sandbox: each project gets its own microVM and network, so an untrusted project cannot
+   reach another project's files or listening ports. Direct network communication between sandboxes
+   is blocked and cannot be re-enabled by policy.
+
+The second one is not a goal here, it is a byproduct, and the distinction matters for what you should
+do when it gets in the way. Projects on this machine belong to one person at one trust level, so
+separating them was never the point. It is worth keeping only because it costs nothing: the sign-in
+is held on the host, so ten sandboxes are no more setup than one. If sharing ever turns out to be
+simpler for some piece of work, mounting several directories into one sandbox is supported and is the
+right answer — the boundary worth defending is the first one.
 
 ## Startup and restart
 

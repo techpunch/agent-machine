@@ -9,10 +9,12 @@ anywhere else.
 The sign-in happens inside a sandbox with `/login`. No SSH tunnel and no browser on the server —
 `sbx` handles the flow.
 
-It is once per sandbox. Sandboxes are long-lived and reattach, so in practice that means once per
-project — not per session. Only deleting a sandbox costs you the sign-in again.
+It is once, not once per project. The resulting session token is held on the host and injected into
+outbound requests by the proxy, so it is never written inside a sandbox and every sandbox is
+authenticated without signing in again. That is also why the subscription is the recommended path
+here rather than an API key: it is both less work and less exposure.
 
-Two things worth knowing before you do it. That token is the one genuinely valuable thing inside a
-sandbox, and signing out everywhere from your Claude account settings is the kill switch if the
-server is ever suspect. And consider using an account separate from your personal one — see
-docs/shared-setup.md for why.
+Two things worth knowing before you do it. Signing out everywhere from your Claude account settings
+is the kill switch if the server is ever suspect, and a `/login` session expires eventually — Claude
+Code warns three days out, which is worth catching on a machine you are not sitting at. And consider
+using an account separate from your personal one — see docs/shared-setup.md for why.
