@@ -21,9 +21,8 @@ agent-run ~/work/<repo>             # trusted: shares the network and the creden
 agent-run ~/work/<repo> untrusted   # untrusted: own network, no credential
 ```
 
-A container can commit but cannot push: no GitHub credential enters the VM, let alone a container.
-Work comes out as a patch you read and apply on the Mac — see "Getting code back out" in
-[`../../docs/secrets-and-egress.md`](../../docs/secrets-and-egress.md).
+A container can commit but cannot push to anything you care about — see
+[`../../docs/pushing-agent-code.md`](../../docs/pushing-agent-code.md) for how work gets out.
 
 ## What the launcher enforces
 

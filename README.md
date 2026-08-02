@@ -73,6 +73,8 @@ In case you're curious to know more about how it works and the internals:
   `/setup`, and reading the records it leaves behind.
 - [`docs/secrets-and-egress.md`](docs/secrets-and-egress.md) — what may live in the VM, and why yolo
   mode on the Mac itself is only for this repo. Read before putting a project in there.
+- [`docs/pushing-agent-code.md`](docs/pushing-agent-code.md) — getting the agent's work out of the VM
+  and pushed, without a credential that can reach your real branches.
 - [`docs/host-agent-design.md`](docs/host-agent-design.md) — why the host and the VM are separate.
 - [`docs/shared-setup.md`](docs/shared-setup.md) — accounts and tailnet, once before the first server.
 - [`CLAUDE.md`](CLAUDE.md) — repo layout and how to write a recipe.

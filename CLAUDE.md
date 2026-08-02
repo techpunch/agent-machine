@@ -87,8 +87,9 @@ That file is the single source for it; do not restate it elsewhere.
   recipe), `update` (what has gone stale, and fix it). Thin wrappers over `bin/cookbook` that say
   what Claude's part of the job is.
 - `docs/` — `running-the-cookbook.md` (the driver's guarantees, the two records, what not to do),
-  `secrets-and-egress.md` (where agents may run, and with what), `host-agent-design.md` (why the
-  host and VM split), `shared-setup.md` (once, before the first server).
+  `secrets-and-egress.md` (where agents may run, and with what), `pushing-agent-code.md` (getting
+  work out of the VM), `host-agent-design.md` (why the host and VM split), `shared-setup.md` (once,
+  before the first server).
 
 Goals, recipes and prereqs share one frontmatter format, so `meta_file()` parses all three.
 

@@ -100,8 +100,9 @@ worthless and the pivot impossible.
 
 - SSH keys, or an agent forwarded from your laptop
 - Cloud credentials of any kind: AWS, GCP, Cloudflare, provider API keys
-- A GitHub push token, however narrowly scoped. Pushing is the host's job — see
-  "Getting code back out" below
+- Any credential that can push to a repository you care about. Pushing to your real branches is the
+  host's job. A fine-grained token that can only write a throwaway scratch repo is the one
+  deliberate exception — see [`pushing-agent-code.md`](pushing-agent-code.md)
 - `.env` files, or a repo whose git history contains one
 - Password-manager exports, recovery codes, session cookies
 - Your actual working copy of anything. Clone fresh, shallow, and throwaway.
@@ -169,66 +170,12 @@ cd ~/work/<repo> && claude --dangerously-skip-permissions
 Destroy the checkout when the task is done. Persistence is not a feature here — a fresh clone per
 task is what keeps the VM boring to compromise.
 
-## Getting code back out: push from the host, never the VM
+## Getting code back out
 
-The VM clones over HTTPS with no credential, so it can read a public repo and can commit locally,
-and that is all it should be able to do. Pushing happens on the Mac, with your GitHub credentials,
-which never enter the VM.
+The VM clones over HTTPS with no credential, so it can read a public repo and commit locally, and
+that is all it should be able to do. Pushing happens on the Mac, with credentials that never enter
+the VM.
 
-This is the same rule as everywhere else here, applied to the one credential people are most tempted
-to make an exception for. Anything in the VM can leave the VM — that is the standing rule, and it
-does not soften because the secret is convenient. A push token sitting in the guest is a token a
-prompt injection can read out of a dependency's README and post anywhere, and the VM is precisely
-where you run code you have not reviewed. Nothing about a token being "just for git" changes that.
-
-So the work comes out as a patch and goes in through your own clone:
-
-```
-# on the Mac, in your real checkout of the project
-colima ssh --profile agent -- \
-  git -C ~/work/<repo> format-patch --stdout origin/main > /tmp/<repo>.patch
-git am /tmp/<repo>.patch      # or `git apply` to stage without committing
-git log -p                    # read it
-git push
-```
-
-The extra hop is the point rather than a tax. The diff crosses the boundary as text you look at, and
-the practitioners this design follows are unanimous that review throughput — not agent throughput —
-is the thing that actually limits this kind of work.
-
-## The token on the host
-
-Scope the credential you push with, rather than using one that can do anything to everything. For a
-classic personal access token, these are enough for day-to-day development:
-
-| Scope | What it buys |
-|---|---|
-| `repo` | Push code, create and edit branches, open pull requests, manage releases and issue labels |
-| `workflow` | Create and edit `.github/workflows/*.yml`, so setting up CI does not fail on permissions |
-| `write:packages`, `read:packages` | Publish and pull build artifacts from GitHub Packages |
-| `project` | GitHub Projects — boards, roadmaps, task tracking |
-| `gist` | Optional; only if you share snippets |
-
-Despite reading as "full control of private repositories", `repo` cannot delete a repository. That
-needs `delete_repo`, which is a separate scope, and you should not grant it.
-
-GitHub's fine-grained tokens are the alternative and scope per repository rather than per capability,
-at the cost of a maximum one-year expiry that will eventually surprise you. Either is fine; an
-unscoped classic token is not.
-
-## What the token still lets someone do
-
-Worth being clear, because omitting `delete_repo` reads like more protection than it is. The `repo`
-scope still allows force-pushing over a branch and deleting branches through ordinary git commands.
-Nobody can wipe the repository, but they can wipe `main`'s history, which for most purposes is the
-same afternoon lost.
-
-Token scopes cannot fix that, because the token is meant to push. The fix is on the repository, in
-Settings under Branches or Rulesets:
-
-- Add a protection rule for `main` (and `develop`, if you use one).
-- Enable Restrict force pushes and Restrict deletions.
-- Optionally require a pull request, with review, before merging.
-
-Scope the token so a leak is bounded, and protect the branch so a mistake is bounded. They defend
-against different things and you want both.
+How the work crosses that gap — a scratch repo the VM can write and nothing else, a patch over the
+ssh pipe, why a shared mount is the one shortcut to avoid, and how to scope the token you push with
+— is [`pushing-agent-code.md`](pushing-agent-code.md).
