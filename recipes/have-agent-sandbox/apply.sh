@@ -90,4 +90,15 @@ corrects itself' in CLAUDE.md. An unset policy means the first 'sbx run' prompts
 prompt on a headless server hangs."
 fi
 
+# Default-deny fails quietly unless something makes it loud. The proxy is explicit — a blocked
+# request gets `HTTP/1.1 403 Forbidden` with `Blocked by network policy: domain <host>` and the
+# reason — but an agent that sees that will usually route around it and answer from memory, which
+# reads as confident and is a worse outcome than being told it could not read the docs.
+#
+# The guidance that tells it not to lives in sandbox-CLAUDE.md next to this script. Installing it
+# needs a running sandbox, since `~/.claude` is inside one, so it is a note rather than a step:
+# there is no confirmed way to write that volume from the host without one.
+note "install the sandbox guidance once, from inside your first sandbox:"
+note "  sbx run --clone claude   # then paste recipes/have-agent-sandbox/sandbox-CLAUDE.md into ~/.claude/CLAUDE.md"
+
 note "next: sbx run --clone claude   (then /login inside the sandbox, once)"

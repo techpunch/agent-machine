@@ -73,6 +73,29 @@ The rule worth keeping: documentation and package hosts earn a place, telemetry 
 not. If you find yourself adding a dozen domains for one task, that is a signal to scope the rule to
 that sandbox rather than loosening the baseline for everything.
 
+## Making a denial loud
+
+A blocked request is not silent at the wire — the proxy returns:
+
+```
+HTTP/1.1 403 Forbidden
+Blocked by network policy: domain example.com:443
+detail: no matching allow rule — blocked by default deny policy
+```
+
+That names the domain and is distinguishable from a `404`, which is the origin answering. The problem
+is not the error, it is what an agent does with it: routing around it and answering from memory reads
+as a confident answer and is often wrong about current APIs.
+
+Two halves, because they have different audiences:
+
+- `sandbox-CLAUDE.md` next to this recipe tells the agent to stop and name the domain rather than
+  work around it, and says the fix costs one command. Install it once at `~/.claude/CLAUDE.md`
+  inside a sandbox — that path is on the persistent volume, so later sandboxes inherit it.
+- `./bin/cookbook denials` asks the proxy instead of the agent. That matters because the failure this
+  guards against is an agent that did not mention it, and because a denial hit by a subprocess — a
+  build script, a package manager — never surfaces as an agent tool call at all.
+
 There is a better answer than a long allowlist for documentation specifically — a doc broker such as
 Context7, or a self-hosted docs instance, puts thousands of libraries behind one allowed host. Worth
 reaching for before the allowlist grows past a screenful.

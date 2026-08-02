@@ -10,6 +10,7 @@
 #   cookbook status [recipe...]    what is already true on this server (default: everything)
 #   cookbook list                  every recipe and whether it is ready or blocked
 #   cookbook stale                 what has gone out of date: packages, images, versions
+#   cookbook denials [sandbox]     what the egress policy blocked, and how to allow it
 #   cookbook log [n]               the last n lines of the run log
 #
 # Goals and recipes are interchangeable as arguments; goals are the human-facing names.
@@ -323,6 +324,28 @@ cmd_stale() {
     "$(for r in $(all_recipes); do is_blocked "$r" && echo x; done | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
 }
 
+# What the egress policy refused. Separate from asking the agent, deliberately: the failure mode
+# this exists for is an agent that hit a 403, decided to be helpful, and answered from memory
+# without mentioning it. This asks the proxy instead, so it also catches denials from subprocesses —
+# a build script or a package manager — which never surface as agent tool calls at all.
+#
+# The denial list is also the candidate allowlist. Documentation and package hosts earn a place;
+# telemetry and analytics do not.
+cmd_denials() {
+  local sbx
+  sbx=$(sbx_bin) || { printf 'sbx is not installed — nothing to report\n'; return 0; }
+
+  printf 'Blocked requests, most recent last. Allow one with:\n'
+  printf '  %s policy allow network <domain>\n\n' "$sbx"
+
+  # `policy log` covers allowed and denied; only the denials are actionable here.
+  if ! out=$(with_timeout 60 "$sbx" policy log ${1:+"$1"} 2>/dev/null); then
+    printf 'could not read the policy log\n' >&2
+    return 1
+  fi
+  printf '%s\n' "$out" | /usr/bin/grep -i denied || printf 'nothing denied.\n'
+}
+
 cmd_log() {
   [ -f "$RUN_LOG" ] || { printf 'no run log yet at %s\n' "$RUN_LOG"; return 0; }
   printf '%s\n\n' "$RUN_LOG"
@@ -398,6 +421,7 @@ case "${1:-}" in
   plan)      shift; [ $# -gt 0 ] || { echo "usage: cookbook plan <goal|recipe>..." >&2; exit 1; }; cmd_plan "$@" ;;
   apply)     shift; [ $# -gt 0 ] || { echo "usage: cookbook apply <goal|recipe>..." >&2; exit 1; }; cmd_apply "$@" ;;
   stale)     cmd_stale ;;
+  denials)   shift; cmd_denials "${1:-}" ;;
   log)       shift; cmd_log "${1:-40}" ;;
   *)         /usr/bin/sed -n '2,16p' "${BASH_SOURCE[0]}" | /usr/bin/sed 's/^# \{0,1\}//' ;;
 esac
