@@ -1,38 +1,34 @@
 #!/bin/bash
 . "$(dirname "$0")/../../lib/common.sh"
 
-colima_bin >/dev/null || { miss "colima not installed"; verify_result; }
-if ! vm_ssh true >/dev/null 2>&1; then
-  miss "the agent VM is not reachable"
-  verify_result
-fi
+home=$(_admin_home)
+session="${TMUX_SESSION:-agents}"
 
-session="${VM_TMUX_SESSION:-agents}"
-
-ver=$(vm_ssh sh -c 'tmux -V' 2>/dev/null | /usr/bin/tr -d '\r')
-if [ -n "$ver" ]; then
-  ok "tmux in the VM: $ver"
+tmux=""
+for c in /opt/homebrew/bin/tmux /usr/local/bin/tmux /usr/bin/tmux; do
+  [ -x "$c" ] && { tmux="$c"; break; }
+done
+if [ -n "$tmux" ]; then
+  ok "tmux at $tmux ($("$tmux" -V 2>/dev/null))"
 else
-  miss "tmux is not installed in the VM"
+  miss "tmux not installed"
   verify_result
 fi
 
-vm_ssh sh -c 'test -f ~/.tmux.conf' >/dev/null 2>&1 \
-  && ok "~/.tmux.conf present" \
-  || miss "no ~/.tmux.conf in the VM"
+[ -f "$home/.tmux.conf" ] && ok "~/.tmux.conf present" \
+                          || miss "no ~/.tmux.conf"
 
-vm_ssh sh -c 'test -x ~/.local/bin/agents' >/dev/null 2>&1 \
-  && ok "agents helper present and executable" \
-  || miss "no ~/.local/bin/agents helper in the VM"
+[ -x "$home/.local/bin/agents" ] && ok "agents helper present and executable" \
+                                 || miss "no ~/.local/bin/agents helper"
 
-vm_ssh sh -c 'grep -q "\.local/bin" ~/.profile' >/dev/null 2>&1 \
+grep -q '\.local/bin' "$home/.zprofile" 2>/dev/null \
   && ok "~/.local/bin on PATH for a login shell" \
   || miss "~/.local/bin not on PATH — the agents helper won't be found"
 
-# A grid that is not currently running is not a failure: tmux sessions live with the VM,
-# and a fresh boot has none until you attach. Report it rather than failing on it.
-if vm_ssh sh -c "tmux has-session -t '$session'" >/dev/null 2>&1; then
-  panes=$(vm_ssh sh -c "tmux list-panes -s -t '$session' | wc -l" 2>/dev/null | /usr/bin/tr -d '\r ')
+# A grid that is not currently running is not a failure: tmux sessions live with the login
+# session, and a fresh boot has none until you attach. Report it rather than failing on it.
+if "$tmux" has-session -t "$session" 2>/dev/null; then
+  panes=$("$tmux" list-panes -s -t "$session" 2>/dev/null | /usr/bin/wc -l | /usr/bin/tr -d ' ')
   ok "session '$session' is running ($panes pane(s))"
 else
   note "session '$session' not running — 'agents' will create it"

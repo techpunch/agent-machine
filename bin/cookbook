@@ -299,52 +299,26 @@ cmd_stale() {
     printf '               fix: sudo softwareupdate -ia --restart\n'
   fi
 
-  if colima_bin >/dev/null 2>&1 && with_timeout 20 "$(colima_bin)" ssh --profile "${VM_PROFILE:-agent}" -- true >/dev/null 2>&1; then
-    rc=0
-    with_timeout 180 "$(colima_bin)" ssh --profile "${VM_PROFILE:-agent}" -- sudo apt-get update -qq >/dev/null 2>&1 || rc=$?
-    out=$(with_timeout 60 "$(colima_bin)" ssh --profile "${VM_PROFILE:-agent}" -- \
-            sh -c 'apt list --upgradable 2>/dev/null | grep -c upgradable' 2>/dev/null | /usr/bin/tr -dc '0-9' || true)
-    printf '   agent VM    %s packages upgradable\n' "${out:-unknown}"
-    [ "${out:-0}" -gt 0 ] 2>/dev/null && printf '               fix: colima ssh --profile %s -- sudo apt-get upgrade -y\n' "${VM_PROFILE:-agent}"
-
-    with_timeout 20 "$(colima_bin)" ssh --profile "${VM_PROFILE:-agent}" -- test -f /var/run/reboot-required >/dev/null 2>&1 \
-      && printf '   agent VM    reboot required — colima restart --profile %s\n' "${VM_PROFILE:-agent}"
-
-    # An image older than the Dockerfile that built it is a rebuild nobody ran.
-    local img_epoch df_epoch
-    img_epoch=$(with_timeout 30 "$(colima_bin)" ssh --profile "${VM_PROFILE:-agent}" -- \
-      sh -c "date -d \"\$(docker image inspect --format '{{.Created}}' ${VM_AGENT_IMAGE:-agent-machine/agent:latest} 2>/dev/null)\" +%s 2>/dev/null" 2>/dev/null | /usr/bin/tr -dc '0-9' || true)
-    df_epoch=$(/usr/bin/stat -f %m "$RECIPES_DIR/have-containers/Dockerfile" 2>/dev/null || echo 0)
-    if [ -n "$img_epoch" ]; then
-      age=$(( ( $(date +%s) - img_epoch ) / 86400 ))
-      if [ "$df_epoch" -gt "$img_epoch" ]; then
-        printf '   agent image built %s days ago, older than the Dockerfile — rebuild\n' "$age"
-        printf '               fix: ./bin/cookbook apply have-containers\n'
-      else
-        printf '   agent image built %s days ago\n' "$age"
-        [ "$age" -gt 30 ] && printf '               a rebuild picks up base-image security updates\n'
-      fi
+  if sbx=$(sbx_bin 2>/dev/null); then
+    who=$(with_timeout 30 "$sbx" whoami 2>/dev/null | /usr/bin/tr -d '\r')
+    if [ -n "$who" ]; then
+      printf '   sbx         signed in as %s, policy %s\n' "$who" "${SBX_POLICY:-unset}"
+      out=$(with_timeout 30 "$sbx" ls 2>/dev/null | /usr/bin/tail -n +2 | /usr/bin/wc -l | /usr/bin/tr -d ' ')
+      printf '               %s sandbox(es) present\n' "${out:-0}"
+      [ "${out:-0}" -gt 0 ] 2>/dev/null && printf '               stale ones cost disk: sbx ls, then sbx rm <name>\n'
     else
-      printf '   agent image not built yet\n'
+      printf '   sbx         installed but not signed in\n'
     fi
-
-    out=$(with_timeout 30 "$(colima_bin)" ssh --profile "${VM_PROFILE:-agent}" -- \
-            sh -c '. ~/.bashrc 2>/dev/null; claude --version' 2>/dev/null | /usr/bin/tr -d '\r' || true)
-    [ -n "$out" ] && printf '   claude      %s in the VM\n' "$out"
   else
-    printf '   agent VM    not reachable — VM checks skipped\n'
+    printf '   sbx         not installed — agent sandbox checks skipped\n'
   fi
 
   # Judgement calls: true answers live on the internet, not on this box. Named here so
   # they cannot be forgotten; /update is what actually researches them.
   printf '\n== needs judgment  (run /update, which researches these)\n'
-  printf '   base image  %s\n' "$(/usr/bin/awk '/^FROM /{print $2}' "$RECIPES_DIR/have-containers/Dockerfile" 2>/dev/null)"
-  printf '               is that codename still Debian current stable, and in full support?\n'
-  if colima_bin >/dev/null 2>&1; then
-    printf '   colima      %s\n' "$(with_timeout 20 "$(colima_bin)" version 2>/dev/null | /usr/bin/head -1 || echo unknown)"
-    printf '               any release with fixes worth taking?\n'
-  fi
-  printf '   claude code  installed from claude.ai/install.sh — any advisory affecting it?\n'
+  printf '   sbx         a proprietary dependency in the agent layer — still free? still maintained?\n'
+  printf '   policy      %s — is that preset still the right posture for what runs here?\n' "${SBX_POLICY:-unset}"
+  printf '   claude code  installed inside sandboxes — any advisory affecting it?\n'
   printf '   blocked      %s recipe(s) deferred; has anything they wait on changed?\n' \
     "$(for r in $(all_recipes); do is_blocked "$r" && echo x; done | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
 }

@@ -1,54 +1,42 @@
 ---
 name: have-coordination
-summary: The layer you actually drive the server through — a persistent tmux grid in the VM.
-requires: [have-vm-claude-code]
+summary: The layer you actually drive the server through — a persistent tmux grid.
+requires: [have-homebrew]
 root: no
 gates: none
 ---
 
-A tmux session inside the VM, one pane per project, that survives you closing the laptop. You attach
+A tmux session on the server, one pane per project, that survives you closing the laptop. You attach
 to that one session instead of opening a terminal per agent, and detaching leaves everything running.
 
-What it installs: tmux in the guest, a managed `~/.tmux.conf`, and an `agents` helper on the guest's
-PATH that attaches to the session or creates it if it is not there — `tmux new-session -A`, so there
-is one entry point and no way to end up with a second detached session you forgot about.
-
-Attach from the Mac, or from anywhere over Tailscale:
+What it installs: tmux, a managed `~/.tmux.conf`, and an `agents` helper that attaches to the session
+or creates it if it is not there — `tmux new-session -A`, so there is one entry point and no way to
+end up with a second detached session you forgot about.
 
 ```
-ssh <admin>@<server>
-colima ssh --profile agent -- -t agents
+ssh <server> -t agents        # attach the grid from anywhere on the tailnet
+sbx run --clone claude        # in a pane: one project, in its own sandbox
 ```
 
-Then split panes and start an agent in each. The session name is recorded as `VM_TMUX_SESSION`.
+## Why the grid is on the host now
 
-## Why this and not an orchestrator
+It used to live inside the VM, because the VM was where agents ran. With `sbx` each agent gets its own
+microVM per invocation, so there is no long-lived guest to hold the session — and putting the grid
+inside a disposable sandbox would defeat the point of it outlasting your connection.
 
-The people running many agents at volume agree the bottleneck is not spawning or coordinating them,
-it is how fast you can review what they produce — and the wrapper apps that hide the terminal tend to
-get discarded for that reason. A multiplexer is the smallest thing that solves the actual problem,
-which is that agent processes must outlive your SSH connection. See "Driving the setup" in
-[`../../docs/host-agent-design.md`](../../docs/host-agent-design.md).
+So the grid runs on the Mac and each pane starts a sandbox. That is simpler in a way worth noting:
+this recipe no longer depends on the agent layer at all. It requires only Homebrew, which means the
+terminal grid works whether or not you have got as far as installing `sbx`.
 
-Add a worktree board later if reading diffs across many tasks becomes the thing that slows you down.
-Not before.
+## The session is not restarted for you
 
-## Why it does not need containers
-
-This requires `have-vm-claude-code`, not `have-containers` or `have-agent-auth`. A multiplexer holding
-sessions does not care how many agents there are or what they run in, so the grid works today against
-the Claude Code already in the VM and gains panes as more agents arrive.
+tmux sessions live and die with the login session. After a reboot the grid is gone and `agents`
+creates a fresh one. That is deliberate — auto-recreating panes would mean auto-starting agent runs,
+and the posture here is to bring the machine back unattended but launch agent work by hand.
 
 ## Phone access
 
 Nothing to install. Claude Code Remote Control (`/rc` in a session) drives one specific session from
-the Claude mobile app, and Codex has the equivalent through the ChatGPT app once it is signed in.
-Both keep execution in the VM — only chat and tool results cross the bridge. They are for nudging
-something already running while you are away from the desk, not for surveying the whole grid; for
-that, attach.
-
-## The session is not restarted for you
-
-tmux sessions live and die with the VM. After a VM restart the grid is gone and `agents` creates a
-fresh one. That is deliberate — auto-recreating panes would mean auto-starting agent runs, and the
-posture in the design doc is to auto-start the sandbox but launch agent runs by hand.
+the Claude mobile app. It keeps execution on the server — only chat and tool results cross the
+bridge. It is for nudging something already running while you are away from the desk, not for
+surveying the whole grid; for that, attach.

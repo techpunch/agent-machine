@@ -20,7 +20,6 @@ _admin_home() {
 
 STATE_DIR="${AGENT_MACHINE_STATE_DIR:-$(_admin_home)/.agent-machine}"
 TS_AGENT_LABEL="com.agent-machine.tailscale-relaunch"
-VM_AGENT_LABEL="com.agent-machine.agent-vm"
 SERVER_ENV="$STATE_DIR/server.env"
 SERVER_LEDGER="$STATE_DIR/server.md"
 RUN_LOG="$STATE_DIR/run.log"
@@ -237,18 +236,11 @@ ts_cli() {
   return 1
 }
 
-colima_bin() {
-  for c in /opt/homebrew/bin/colima /usr/local/bin/colima; do
+sbx_bin() {
+  for c in /opt/homebrew/bin/sbx /usr/local/bin/sbx; do
     [ -x "$c" ] && { printf '%s' "$c"; return 0; }
   done
   return 1
-}
-
-# Run a command inside the agent VM. Recipes that configure the guest go through here so
-# the profile name lives in one place.
-vm_ssh() {
-  local colima; colima=$(colima_bin) || return 1
-  "$colima" ssh --profile "${VM_PROFILE:-agent}" -- "$@"
 }
 
 brew_bin() {
