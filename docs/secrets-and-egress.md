@@ -51,8 +51,18 @@ It is not a wall against a compromised agent. An agent running as the admin user
 below: its own kernel, no view of the Mac's filesystem, no keychain access. Do not confuse the two.
 
 One caveat to confirm on your own server: whether a Keychain read succeeds over SSH while the GUI
-session is auto-logged in. It is version-dependent. If it does not work, the failure is safe — the
-read times out and the recipe gates — and the fix is to store the item over Screen Sharing instead.
+session is auto-logged in. The login keychain is unlocked by the GUI login, so with auto-login it
+should be unlocked by the time you can SSH in, and `-T /usr/bin/security` on the item means the CLI
+can read it without a GUI prompt. But it can relock on a timeout, and this is a common enough failure
+that other tools hit it too. Check it directly rather than inferring:
+
+```
+security show-keychain-info ~/Library/Keychains/login.keychain-db
+```
+
+An answer means unlocked. A password prompt means locked, and `security unlock-keychain` is the fix.
+If the read does not work at all, the failure is safe — it times out and the recipe gates — and the
+fallback is to store the item over Screen Sharing instead.
 
 # Part 2 — Where agents may run
 
@@ -112,23 +122,35 @@ make the payoff worthless, the pivot impossible, and the destinations few.
 write `.git/config` in a directory you later run git in has a path to executing commands on your Mac.
 [`pushing-agent-code.md`](pushing-agent-code.md) walks that attack in full.
 
-## The one exception, stated plainly
+Do not read `--clone` as "only the tracked files go in", because that is the natural reading and it
+is wrong. Your host folder is also mounted read-only at `/run/sandbox/source`, and that is the whole
+folder — an untracked `.env`, a `.envrc.private`, a stray key you dropped there while debugging. This
+was reported upstream and closed as intended behaviour, so it will not change. `--clone` makes the
+write direction safe. Keeping secrets out of the directory in the first place is still your job, and
+it is why `.env` is on the list above rather than being handled for you.
 
-Signing the agent in with your subscription puts a long-lived OAuth token inside the sandbox. This
-setup accepts that knowingly.
+## The sign-in is not an exception
 
-What makes it survivable rather than reckless:
+You might expect signing the agent in with your subscription to put a long-lived token inside the
+sandbox. It does not, and this is the one place where the design is better than it looks.
 
-- It is the only thing in there worth stealing. Everything else on the list above is absent, so an
-  exfiltration gets one revocable credential instead of your estate.
-- It cannot pivot. See below.
-- It is revocable, and you should know how before you need to: sign out everywhere from your
-  Anthropic account settings, which invalidates the refresh token. Do that the moment anything looks
-  off — an unexplained session, unfamiliar usage, an agent that behaved strangely.
+`/login` is typed inside a sandbox, but the OAuth flow terminates on the host. The session token is
+stored in the host keychain, and the proxy injects it into outbound requests on the way past — the
+sandbox sees a sentinel value. So the agent can make authenticated calls and cannot read, log or
+exfiltrate the credential, and every later sandbox is authenticated without signing in again.
 
-If that trade sounds wrong for your situation, the alternative is a scoped, spend-limited API key
-instead of the subscription — still a static secret, but a bounded one you can cap and rotate
-without touching your main account.
+That has three consequences worth being explicit about:
+
+- The list above is now the whole list. There is no "except the one credential we accept" clause.
+- An API key is not a safer alternative. It is injected by the same proxy, so it buys no isolation
+  the subscription does not already have, and it swaps a flat subscription for metered billing.
+- Revocation is still worth knowing before you need it: sign out everywhere from your Anthropic
+  account settings. Do that the moment anything looks off — an unexplained session, unfamiliar usage,
+  an agent that behaved strangely.
+
+What this does not cover is the model's own output. A compromised agent cannot steal the token, but
+it can still spend it, and it can still put whatever it can read into a request to an allowed domain.
+The credential is safe; the reasoning is not.
 
 ## Out, and not sideways
 
@@ -155,10 +177,12 @@ The resolving idea is that the danger is not reading the web. It is having broad
 something worth stealing in the same place at the same time. Exfiltration needs both. So aim never to
 have both at once rather than choosing between research and safety:
 
-- Keep the research and the secret-holding apart. A sandbox with a wide policy and no credentials can
-  read whatever it likes and has nothing to leak. The sandbox holding a token and a real repo runs
-  under the baseline. `sbx policy allow network ... --sandbox <name>` scopes a rule to one sandbox,
-  which is what makes this practical rather than theoretical.
+- Keep the research and the source apart. A sandbox with a wide policy and nothing private in it can
+  read whatever it likes and has nothing to leak. The sandbox holding a real repo runs under the
+  baseline. `sbx policy allow network ... --sandbox <name>` scopes a rule to one sandbox, which is
+  what makes this practical rather than theoretical, and an extra sandbox costs nothing now that the
+  sign-in is held on the host. This used to be advice you would talk yourself out of; it is not any
+  more.
 - Put one trusted endpoint in front of documentation instead of allowlisting the web. A doc broker —
   Context7, or a self-hosted equivalent — collapses thousands of libraries into a single allowed
   host, or none at all if you run it locally.
@@ -191,12 +215,13 @@ sbx run --clone --name <project> claude   # reattaches if it already exists
 git fetch sandbox-<project>               # bring the work back, on the host
 ```
 
-Sandboxes are long-lived, so the normal shape is one per project, kept and reattached to. That is
-also where the sign-in lives, so tearing one down costs you a `/login`.
+Sandboxes are long-lived, so the normal shape is one per project, kept and reattached to. The
+sign-in is not inside them, so destroying one costs you nothing but the state you had built up in it.
 
 Destroy one deliberately rather than habitually. Worth doing after work you did not trust, or when
 you want a known-clean starting point — a sandbox that has been running untrusted code for a month
-has accumulated whatever that code left behind. Not worth doing after every task.
+has accumulated whatever that code left behind. Not worth doing after every task, because installed
+packages and configuration go with it.
 
 
 ## Getting code back out
