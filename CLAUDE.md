@@ -43,6 +43,15 @@ How to work when you hit one:
 - Fix the docs in the same pass. A fix that leaves `recipe.md`, `README.md` or a doc asserting the
   old behaviour is half a fix, and the half that is left is the half that misleads someone later.
   Search for the claim you just invalidated rather than only editing the file you were in.
+- Go and look it up. If something is worth knowing — what a tool returns on failure, whether a
+  config persists, which flag is right — search for it rather than writing "I don't know" and moving
+  on. Only record an unknown when you have looked and the answer is genuinely not published, and say
+  where you looked. Two things in this repo were wrong because a page went unread: the client-side
+  error for a blocked request was documented all along, and so was the fact that sandboxes share no
+  home directory, which had been asserted the other way in three files.
+- Never invent a command. If you cannot confirm the syntax, say so and leave a manual step with the
+  exact intent — a fabricated flag fails on somebody's first real run, which is the worst place to
+  find out.
 - Run `./bin/check` before you finish. It catches the class of mistake that is invisible on a
   laptop — an unexecutable script the driver would skip silently, a `needs:` pointing at nothing, a
   recipe marked blocked that still has an `apply.sh`. It cannot tell you a recipe works; only a real

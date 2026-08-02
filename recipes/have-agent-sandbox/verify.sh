@@ -5,7 +5,11 @@ if sbx=$(sbx_bin); then
   ok "sbx at $sbx ($(with_timeout 20 "$sbx" version 2>/dev/null | /usr/bin/head -1 | /usr/bin/tr -d '\r'))"
 else
   miss "sbx not installed"
-  verify_result
+  [ -f "$(cd "$(dirname "$0")" && pwd)/kit/spec.yaml" ] \
+  && ok "kit present (denial guidance and doc allowlist)" \
+  || miss "no kit/spec.yaml beside this recipe"
+
+verify_result
 fi
 
 # Every call is time-limited. sbx talks to a host daemon and, when signed out, to Docker's servers;

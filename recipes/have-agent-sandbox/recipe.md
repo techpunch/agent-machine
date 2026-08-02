@@ -22,8 +22,9 @@ remain your problem.
 ## Day to day
 
 ```
-sbx run --clone claude            # a sandbox on a read-only clone of the current repo
+sbx run --clone --kit recipes/have-agent-sandbox/kit claude
 git fetch sandbox-<name>          # bring the work back, on the host
+sbx rm <name>                     # done with it
 ```
 
 `--clone` matters. The default mounts your working tree read-write, and an agent that can write
@@ -73,6 +74,18 @@ The rule worth keeping: documentation and package hosts earn a place, telemetry 
 not. If you find yourself adding a dozen domains for one task, that is a signal to scope the rule to
 that sandbox rather than loosening the baseline for everything.
 
+## The kit
+
+`kit/spec.yaml` beside this recipe carries two things every sandbox should start with: a starter
+documentation allowlist, and guidance telling the agent to report a blocked request rather than work
+around it.
+
+It is a kit rather than a `~/.claude/CLAUDE.md` because sandboxes inherit nothing from the host —
+your Mac's `~/.claude` stays on your Mac — and because a kit is a committed file, so both the
+allowlist and the guidance are reviewable in this repo instead of living in one machine's local
+policy store. Kits cannot write the memory file directly, since sandboxes seed that path during
+setup and would overwrite it, so the guidance goes through `agentContext`, which appends to it.
+
 ## Making a denial loud
 
 A blocked request is not silent at the wire — the proxy returns:
@@ -89,9 +102,9 @@ as a confident answer and is often wrong about current APIs.
 
 Two halves, because they have different audiences:
 
-- `sandbox-CLAUDE.md` next to this recipe tells the agent to stop and name the domain rather than
-  work around it, and says the fix costs one command. Install it once at `~/.claude/CLAUDE.md`
-  inside a sandbox — that path is on the persistent volume, so later sandboxes inherit it.
+- The kit's `agentContext` tells the agent to stop and name the domain rather than work around it,
+  and says the fix costs one command — which matters, because without that a model reasonably
+  concludes that finding another way is the helpful thing to do.
 - `./bin/cookbook denials` asks the proxy instead of the agent. That matters because the failure this
   guards against is an agent that did not mention it, and because a denial hit by a subprocess — a
   build script, a package manager — never surfaces as an agent tool call at all.
@@ -105,10 +118,14 @@ reaching for before the allowlist grows past a screenful.
 The Docker token authenticates `sbx` itself and belongs in the Keychain, fetched by `secret_get` like
 the tailnet key. Read scope is enough. It never reaches `server.env` and never appears in argv.
 
-The agent's own sign-in happens inside a sandbox with `/login`, and persists. On a headless server
-with no unlocked login session `sbx` falls back from the Keychain to an encrypted file under
-`~/.config/com.docker.sandboxes` and says so — the same failure mode `lib/common.sh` guards against
-with its timeout, handled here by the tool.
+The agent's own sign-in happens inside a sandbox with `/login` — and it is **per sandbox**. There is
+no home directory shared between sandboxes, so a new one means signing in again. That is the main
+friction in this setup and it is worth knowing before you meet it.
+
+The alternative is an API key held as an `sbx` secret and injected by the proxy, which every sandbox
+picks up automatically and which the agent never sees in raw form. It trades your subscription for
+metered billing, so it is a real choice rather than an obvious upgrade: take the subscription and the
+repeated login for occasional work, take the key if you are starting sandboxes all day.
 
 ## What this buys, and what it costs
 

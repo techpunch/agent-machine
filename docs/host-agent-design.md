@@ -116,12 +116,19 @@ Two of them, and "where is my sign-in" has two answers.
 | Where | Path | Signed in |
 |---|---|---|
 | Host Mac | the admin user's `~/.claude` | for cookbook work only |
-| Sandbox | inside the microVM | `/login` on first use, persists |
+| Sandbox | inside the microVM | `/login`, once **per sandbox** |
 
-The host one is the session you run `/setup` from and it never touches the other — a sandbox has no
-view of the Mac's filesystem. On a headless server with no unlocked login session, `sbx` falls back
-from the macOS Keychain to an encrypted file under `~/.config/com.docker.sandboxes` and says so; that
-is the same failure mode `lib/common.sh` guards against with its timeout, handled here by the tool.
+The host one is the session you run `/setup` from and it never touches the other. That is not just
+isolation, it is literal: sandboxes inherit nothing from the host's `~/.claude`, and they share no
+home directory with each other either. A new sandbox is a new sign-in.
+
+That is the sharpest friction in this design. The way out is an API key held as an `sbx` secret and
+injected by the host proxy — every sandbox gets it, the agent never sees the raw value — at the cost
+of metered billing instead of a subscription. Worth choosing deliberately rather than discovering on
+the fifth login.
+
+It is also why per-sandbox defaults come from a kit rather than a dotfile: a committed `spec.yaml`
+travels with the repo, where a host-side config would not reach the sandbox at all.
 
 ## Trust boundaries, in order
 
