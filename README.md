@@ -31,25 +31,19 @@ along the way only when it needs to.
 
 You can stop reading now if you'd like and just do it.
 
-### Optional first step: bring your own shell setup
+### Optional first step: bring your claude config & shell setup
 
-Personal, and nothing in this project depends on it. If you keep your dotfiles and Claude config in
-repos, lay them down on the fresh box *before* the clone above, so the machine is already yours by
-the time `/setup` runs. WARNING: this paves any existing git/claude/zsh setup on the machine:
+It can be nice to pave the home dir and ~/.claude dirs before running this project, if you
+keep those in github or on backup.
+
+Note to self: see my home dir private repo first https://github.com/bobfejes/homedir 
+
+Then pave claude (WARNING: deletes existing ~/.claude dir):
 
 ```
-rm -rf ~/homedir ~/.claude
-git clone https://github.com/bobfejes/homedir.git ~/homedir
-cd ~/homedir && find . -maxdepth 1 -mindepth 1 -exec rm -rf ~/{} \; -exec mv {} .. \;
-cd ~ && rmdir homedir
-
+rm -rf ~/.claude
 git clone https://github.com/bobfejes/claude-clojure-plus.git ~/.claude
 ```
-
-The `rm` inside the `find` clears each destination immediately before moving that entry onto it, so
-existing files are replaced rather than silently skipped and existing directories are replaced
-rather than nested inside. `rmdir` at the end is an assertion, not a cleanup: it fails loudly if
-anything was left behind.
 
 ## What `/setup` does
 
