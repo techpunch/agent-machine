@@ -69,30 +69,26 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
      timestamps. `./bin/cookbook log` shows the tail. Tell them where it is; it is the thing
      they will want when something misbehaves in three weeks.
 
-   - Their own copy of the server's details, kept off the server. Do not just mention this —
-     assemble it and hand it to them ready to paste, because nobody does it if it is
-     homework. Read `server.env` and the ledger and print:
+   - The server's own record. Run `./bin/cookbook record`, which writes
+     `~/.agent-machine/server-record.md` from `server.env` and the ledger: name and slug,
+     admin user, tailnet name and IP, FileVault state, what is applied, pointers to where the
+     secrets live, and how to revoke access. Do not assemble this by hand — a hand-written
+     copy is stale by the next run, and the point of generating it is that it never is.
 
-     - The machine's name and slug, the admin user, the Tailscale IP, and where the box
-       physically is.
-     - Whether FileVault is off, and where the admin password lives — they need it to log in
-       at the keyboard, and this cookbook deliberately never took it from them.
-     - Pointers, never values: which password-manager entry holds the tailnet auth key, and
-       that the server has a Keychain item under `agent-machine`. Never print a secret.
-     - What is applied, from the ledger.
-     - How to revoke, which is what they will want when they cannot reach the machine at all:
-       remove the node in the Tailscale admin console, sign out everywhere from the Claude
-       account to kill the token in the sandbox, and rotate the reusable auth key so a stolen
-       machine cannot rejoin.
+     Print it for them too, so it is in front of them rather than being homework. Fill in
+     `SERVER_LOCATION` in `server.env` if they will tell you where the box physically sits;
+     otherwise the record carries a `<FILL IN>` and says so.
 
-     Say where to put it, and why, because the record holds no secrets and "keep it off the
+     Then say where to keep it, and why, because it holds no secrets and "keep it off the
      server" sounds arbitrary without the reason: it is a recovery document, and every
      situation that sends them looking for it — machine stolen, dead, or unreachable — is one
-     where the server cannot be read. A copy on the box as well is fine; the copy that counts
-     is their password manager, or a private note on the laptop or phone they already use as
-     a client. Not in this repo, which is shared and pushed, and never inside an agent
-     sandbox, where anything can leave. If they want one on the server too, `~/.agent-machine/`
-     is the place — it already holds the per-server state and `git pull` never touches it.
+     where the server cannot be read. Being on the box is what makes it fetchable from another
+     machine, and the file ends with the `scp` line to do that; being *only* on the box is what
+     makes it useless. So the copy that counts goes in their password manager, or a private
+     note on the laptop or phone they already use as a client. Not in this repo, which is
+     shared and pushed, and never inside an agent sandbox, where anything can leave.
+
+     Tell them to re-run `./bin/cookbook record` after any later run, since it is a snapshot.
 
 ## Timing is the point
 

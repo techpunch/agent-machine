@@ -19,7 +19,17 @@ writes the ledger and the log:
 ./bin/cookbook list                 # every recipe, including the ones not written yet
 ./bin/cookbook stale                # what has gone out of date
 ./bin/cookbook log                  # every action and result, with timestamps
+./bin/cookbook record               # write the record you keep a copy of elsewhere
 ```
+
+`record` writes `~/.agent-machine/server-record.md` from `server.env` and the ledger — what the
+machine is, what is applied, where its secrets live (pointers, never values), and how to revoke
+access. It is a snapshot, so re-run it after anything that changes the server. Set
+`SERVER_LOCATION` in `server.env` to have it record where the box physically sits.
+
+Keeping it on the server is what lets another machine fetch it over ssh, and the file ends with
+the `scp` line for that. Keeping it *only* there is the mistake: every reason to read it is a
+reason the server cannot be reached, so the copy that counts lives somewhere else.
 
 Run `apply` from a terminal. sudo prompts on `/dev/tty`, so a plan containing a root recipe needs
 a session that has one — Terminal.app on the server, or ssh. Claude Code's shell does not qualify,
