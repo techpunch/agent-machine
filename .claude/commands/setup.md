@@ -112,6 +112,15 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
 
      Tell them to re-run `./bin/cookbook record` after any later run, since it is a snapshot.
 
+   - How to prove unattended recovery, if they applied always-on but not headless. A verify
+     that reads pmset settings back is not a machine you have watched come up, and they will
+     want to know the difference before the server is somewhere inconvenient. Give them the
+     reboot test from a client — `ssh -t <slug> sudo shutdown -r now`, then poll until it
+     answers — and say plainly that it does not test `autorestart`, which only fires on real
+     power loss and can only be tested by pulling the plug. `recipes/make-always-on/recipe.md`
+     has both. If they took headless too, do not raise this: pass one already proved the
+     reboot half in front of them.
+
 ## Timing is the point
 
 The single most valuable thing here is telling people things at the right moment rather than
