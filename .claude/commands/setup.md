@@ -85,9 +85,14 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
        account to kill the token in the sandbox, and rotate the reusable auth key so a stolen
        machine cannot rejoin.
 
-     Say where to put it: their password manager, or a private note on the laptop or phone
-     they already use as a client. Not in this repo, and never inside an agent sandbox, where
-     anything can leave.
+     Say where to put it, and why, because the record holds no secrets and "keep it off the
+     server" sounds arbitrary without the reason: it is a recovery document, and every
+     situation that sends them looking for it — machine stolen, dead, or unreachable — is one
+     where the server cannot be read. A copy on the box as well is fine; the copy that counts
+     is their password manager, or a private note on the laptop or phone they already use as
+     a client. Not in this repo, which is shared and pushed, and never inside an agent
+     sandbox, where anything can leave. If they want one on the server too, `~/.agent-machine/`
+     is the place — it already holds the per-server state and `git pull` never touches it.
 
 ## Timing is the point
 
