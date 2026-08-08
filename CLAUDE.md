@@ -69,6 +69,12 @@ How to work when you hit one:
   run is the only place these defects surface, and an uncommitted fix dies with the session. Commit
   each fix on its own as you go, and tell the user what changed and that it is committed, so the
   next server gets it whether or not this run finishes.
+- Squash your own false starts before they leave. Committing as you go means committing some
+  things that turn out to be wrong — a guard testing the wrong condition, an approach abandoned
+  an hour later. Once the conclusion is reached, fold those into one commit that lands it, while
+  they are still unpushed. History should show what the cookbook decided, not the search for it.
+  Check `git log origin/main..HEAD` first: rewriting is only safe while nothing has been pushed,
+  and verify with `git diff` against a backup ref that the tree came out identical.
 
 The one thing that is not self-correction: editing a recipe to make a verify pass without
 understanding why it failed. That is papering over, it runs as root on every server that pulls this
