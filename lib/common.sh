@@ -10,8 +10,15 @@ set -euo pipefail
 
 # Recipes run under sudo about half the time, and $HOME becomes /var/root when they do.
 # The server state belongs to the admin user either way, so resolve their home explicitly.
+#
+# SUDO_USER is "the login name of the user who invoked sudo" (man sudo), which is not always a
+# human. The recipes that must not run as root re-exec themselves with
+# `sudo -u "$SUDO_USER" -H "$0"`, and in that second process root is the invoker — so SUDO_USER
+# comes back as root and this would resolve the state dir to /var/root, the opposite of its whole
+# purpose, on the one code path that took the trouble to drop privileges. $HOME is already right
+# there because -H set it, so root is the one value to disbelieve.
 _admin_home() {
-  if [ -n "${SUDO_USER:-}" ]; then
+  if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
     /usr/bin/dscl . -read "/Users/$SUDO_USER" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}'
   else
     printf '%s' "$HOME"
@@ -55,8 +62,11 @@ gate() {
 # ---- server state --------------------------------------------------------------
 
 # Anything written under sudo would otherwise land root-owned in the admin user's home.
+# Same reason as _admin_home for disbelieving SUDO_USER=root: after a recipe re-execs itself as
+# the admin user, handing the state dir "back" would hand it to root.
 _own_state_dir() {
-  [ -n "${SUDO_USER:-}" ] && /usr/sbin/chown -R "$SUDO_USER" "$STATE_DIR" 2>/dev/null || true
+  [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ] \
+    && /usr/sbin/chown -R "$SUDO_USER" "$STATE_DIR" 2>/dev/null || true
 }
 
 need_var() {
