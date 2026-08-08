@@ -57,8 +57,12 @@ localhost services and private ranges are unreachable, which is what the old nft
 hand-written to do.
 
 That costs git over SSH, which is why the workflow above clones over HTTPS. It also means a sandbox
-cannot reach your tailnet, which was the pivot this design worried about most and now gets
-structurally rather than by rule.
+cannot reach your tailnet or the LAN the server sits on.
+
+The tailnet is covered twice — the policy in [`../../docs/shared-setup.md`](../../docs/shared-setup.md)
+also denies the server as a source, from the host as well as from here, and Tailscale enforces that
+on the receiving device rather than on this machine. The LAN is covered once, here. Worth knowing
+which is which before deciding what the Mac is allowed to be plugged into.
 
 ## Your agent cannot read the web, and that will bite
 

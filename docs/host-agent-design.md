@@ -20,12 +20,23 @@ The shape that satisfies both: a trusted host user owns the native apps and Tail
 in microVMs that own nothing. The microVM is the security boundary.
 
 Two priorities shape the rest, and they are worth stating because they rule things out. The pivot
-this design cares about most is the tailnet: the server is itself a node, so an agent that gets
-network reach would inherit a path to your laptop and everything else on it, which is why egress
-being blocked at the network layer matters more here than on an ordinary dev box. And running on a
-Claude subscription rather than an API key is a first-class requirement, not a preference — a setup
-that is annoying to sign in to is one you stop using, and the friction would be paid on every
-project forever.
+this design cares about most is the tailnet: the server is itself a node, so anything that gets
+network reach on it would otherwise inherit a path to your laptop and everything else you own. And
+running on a Claude subscription rather than an API key is a first-class requirement, not a
+preference — a setup that is annoying to sign in to is one you stop using, and the friction would be
+paid on every project forever.
+
+The tailnet pivot is closed twice over, deliberately, because the two mechanisms fail for unrelated
+reasons. Sandbox egress blocks private ranges, so agent code cannot reach the tailnet from inside.
+And the tailnet policy names no rule with `tag:host` as a source, so the server cannot open a
+connection to any device you own even from the host, even as root, even if every other control here
+has failed. Traffic goes one way: you reach the server, the server reaches nothing.
+
+The second one is the stronger control and it is worth being clear why. Tailscale enforces ACLs on
+the receiving device, so it is the only protection in this design that the server does not
+administer — a fully compromised host cannot switch it off. It also covers the host itself, which is
+exactly where the sandbox contributes nothing, and it bounds what someone gets by walking off with a
+machine that runs FileVault off and auto-login on.
 
 ## Architecture
 
@@ -82,6 +93,18 @@ The host runs Tailscale as the server's only node. It does two things: advertise
 exit node so you can route traffic through it from untrusted wifi, and carries SSH and Screen Sharing
 so the machine can stay headless.
 
+Both are inbound. The server never needs to open a connection to a device you own, and the tailnet
+policy in `shared-setup.md` says so explicitly by naming no rule with `tag:host` as a source. That
+asymmetry is free — it costs nothing this cookbook does, and ACLs govern traffic between tailnet
+devices rather than a machine's ordinary internet access, so the server still reaches the internet
+exactly as before.
+
+The exit node is the honest exception, and it does not go away. Routing your traffic through the
+server means the server handles your traffic — that is what an exit node is. TLS protects contents;
+hostnames, DNS lookups, timing and volume are visible to whoever controls the machine. There is a
+real tension between advertising this box as an exit node and treating it as potentially
+compromised, and no policy resolves it. Decide which one you mean.
+
 The remote-login services are system-level and root-owned — SSH via `systemsetup -setremotelogin`,
 Screen Sharing via the ARD `kickstart` tool — so they serve the server regardless of who is logged
 in, and a non-root process cannot reconfigure them.
@@ -102,8 +125,9 @@ all permission prompts" acceptable, because it gives something the host side can
 - A separate kernel and filesystem, so an agent cannot read the host's files, Keychain or credentials.
 - A network it does not control: all egress goes through a proxy on the host that enforces a
   deny-by-default policy, and non-HTTP protocols are blocked outright. The host, localhost services
-  and private ranges are unreachable — including the tailnet, which is the pivot this design worried
-  about most, since the server is itself a tailnet node.
+  and private ranges are unreachable — including the tailnet and the LAN the server sits on. The
+  tailnet policy blocks the same pivot independently, so this is the inner of two layers rather than
+  the only one; the LAN is where it is the only one.
 - Disposability. Worst case you delete the sandbox; the host is untouched.
 
 This replaced a hand-built Colima VM, an nftables ruleset and a container launcher. Not because those

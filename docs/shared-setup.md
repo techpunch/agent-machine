@@ -39,12 +39,86 @@ hardcoding them. Filling this block in is what makes a copy of the cookbook your
         automatically. Without it, `make-exit-node` stops at a gate on every server.
       - Treat the key as a secret — password manager only. It expires within 90 days, so regenerate
         before provisioning, or mint it from a Tailscale OAuth client.
+      - Write the policy under "Tailnet policy" below before the first server joins.
       - Tailnet name / org: `<FILL IN>`
       - Reusable `tag:host` auth key — stored at: `<FILL IN>`
 - [ ] Agent accounts and keys — set up once, servers authenticate against them. A server runs one or
       more of these; you sign in with `/login` inside a sandbox on first use.
       - Claude Code (Anthropic) — subscription login or `ANTHROPIC_API_KEY`: `<FILL IN>`
       - Codex (OpenAI) — ChatGPT plan or `OPENAI_API_KEY`: `<FILL IN>`
+
+## Tailnet policy
+
+Tailscale applies a default allow-all policy when the `acls` section is absent, so a server that
+just joined can open a connection to every other device you own. Nothing in this design needs that.
+Traffic goes one way: your devices reach the server, the server reaches nothing.
+
+Write this before the first server joins, so there is never a window where it has full reach.
+
+```json
+{
+  "tagOwners": {
+    "tag:host": ["<your-login@example.com>"],
+  },
+
+  "hosts": {
+    // Any device you want the test below to prove is unreachable from a server.
+    "laptop": "<FILL IN — your laptop's tailnet IP, e.g. 100.101.102.103>",
+  },
+
+  "acls": [
+    // You reach the server: SSH, and Screen Sharing on 5900.
+    {
+      "action": "accept",
+      "src":    ["autogroup:member"],
+      "dst":    ["tag:host:22,5900"],
+    },
+    // You route traffic through the server as an exit node.
+    {
+      "action": "accept",
+      "src":    ["autogroup:member"],
+      "dst":    ["autogroup:internet:*"],
+    },
+    // Your own devices reach each other. Drop this rule if you would rather they did not.
+    {
+      "action": "accept",
+      "src":    ["autogroup:member"],
+      "dst":    ["autogroup:self:*"],
+    },
+  ],
+
+  // Deliberately absent: any rule with "tag:host" as src. That omission is the whole point —
+  // a tagged node is owned by the tailnet rather than by a user, so it is not a member of
+  // autogroup:member and matches no rule above as a source.
+
+  "autoApprovers": {
+    "exitNode": ["tag:host"],
+  },
+
+  "tests": [
+    {
+      "src":  "tag:host",
+      "deny": ["laptop:22", "laptop:5900"],
+    },
+  ],
+}
+```
+
+The `tests` block is what makes this durable. Tailscale runs it on every save and rejects the
+policy if the assertion fails, so a future edit that accidentally grants the server reach is
+refused rather than accepted quietly. Fill in the `hosts` entry or the test cannot run.
+
+Two things this does not cover, both worth knowing rather than discovering:
+
+- Exit-node traffic. Routing through the server means the server handles your traffic — that is
+  what an exit node is. TLS protects contents; hostnames, DNS lookups, timing and volume are
+  visible to whoever controls the machine. No policy changes this. If you would not route your
+  traffic through a machine you are treating as potentially compromised, do not advertise it as an
+  exit node.
+- The LAN. ACLs govern the tailnet, not the physical network the server sits on. A compromised host
+  can still reach other machines on its own subnet. Agent sandboxes cannot, since their egress
+  policy blocks private ranges, but the host is not covered by either mechanism. Put the server
+  somewhere you are comfortable with that, or segment it.
 
 ## Account safety — reduce ban-cascade risk
 

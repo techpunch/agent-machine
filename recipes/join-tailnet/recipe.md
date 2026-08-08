@@ -2,7 +2,7 @@
 name: join-tailnet
 summary: Join the tailnet as this server, using a tagged pre-auth key.
 requires: [have-tailscale, have-server-identity]
-needs: [tailnet-key]
+needs: [tailnet-key, tailnet-acl]
 root: yes
 gates: the auth key, supplied in the environment
 ---
@@ -33,6 +33,24 @@ why the server stays connected across reboots instead of dropping off in 90 days
 The `tag:host` tag, its owner, and the reusable key are shared setup done once — see
 `docs/shared-setup.md`. The host is the only tailnet node on the server: agent sandboxes cannot
 reach the tailnet at all, since their egress policy blocks private ranges outright.
+
+## The tag is a boundary, not a label
+
+`tag:host` is what the tailnet policy keys off, and the policy is written so that no rule names it
+as a source. A tagged node is owned by the tailnet rather than by a user, so it is not part of
+`autogroup:member` and matches nothing as a sender. The result is one-way: your devices reach this
+server, and this server can open a connection to nothing you own.
+
+That is worth more than it looks, because it is the only control here that the server does not
+administer. Tailscale enforces ACLs on the receiving device, so a fully compromised server cannot
+disable it, and it holds for the host itself — not just for sandboxes, which is the one place the
+sandbox boundary contributes nothing. It also bounds what physical theft gets someone, which
+matters on a machine this cookbook deliberately runs with FileVault off and auto-login on.
+
+None of it is verified from here. The policy lives in the admin console, this recipe only joins,
+and a server has no way to read the tailnet policy or prove a peer is unreachable without a peer to
+try. `prereqs/tailnet-acl.md` is where it gets arranged; Tailscale's own `tests` block is what keeps
+it true afterwards.
 
 Verify records `TS_IP` into `server.env` when it finds the server connected, so later recipes and you
 have it without a lookup. That IP is what used to live in an inventory table.

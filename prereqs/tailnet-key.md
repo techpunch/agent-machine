@@ -14,3 +14,6 @@ About five minutes in a browser, on your laptop rather than the server.
 
 Have that key ready to paste when I ask. It is a secret: I will put it in the macOS Keychain
 so later servers pick it up on their own, and it never gets written into this repo.
+
+While you are in Access Controls, do `tailnet-acl` too — it is the same policy file, and writing
+it before the server joins means the server never has a window of full tailnet reach.

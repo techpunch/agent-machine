@@ -63,7 +63,7 @@ The mechanism is one sentence: **git takes instructions from the folder it is ru
 repository has a `.git/config`, and that file can say things like *when you page output, run this
 command* or *before you check the index, run this program*. If the sandbox can write into the shared
 folder, it can write that file. When you then run git there on your Mac, your Mac runs the command —
-as you, with your Keychain, your SSH keys and your tailnet.
+as you, with your Keychain, your SSH keys and everything on the server's own network.
 
 ### What that looks like in practice
 
@@ -87,8 +87,11 @@ Nothing exotic, and nobody has to outsmart the agent:
    agent did before you push.
 5. Git refreshes the index, reads `core.fsmonitor` from that repo's config, and runs the command. On
    your Mac. As your admin user.
-6. It now has your real GitHub token, your SSH keys, your Keychain and a route into your tailnet —
-   none of which the sandbox could ever reach.
+6. It now has your real GitHub token, your SSH keys and your Keychain — none of which the sandbox
+   could ever reach. The tailnet is the one thing it does not get, because the policy denies the
+   server as a source regardless of who is running what on it. That is the whole value of a control
+   the server does not administer, and it is also the limit of it: one pivot closed, the credentials
+   still gone.
 
 Two things worth sitting with. The sandbox behaved correctly throughout: it ran untrusted code in
 isolation, which is its job. And the step that triggered it was you being careful — checking the work

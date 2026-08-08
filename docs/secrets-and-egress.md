@@ -79,8 +79,10 @@ The host case rests entirely on there being no untrusted content in the loop. Yo
 you reviewed them, and they read no external input. Point that same session at a project and the
 argument collapses — source you did not write, dependencies that execute code, issues and docs the
 agent reads, any one of which can carry a prompt injection. On the host there is nothing left to
-catch it: it runs as your admin user, with your Keychain, your SSH keys, your files, and your tailnet
-reach.
+catch it: it runs as your admin user, with your Keychain, your SSH keys, your files, and whatever the
+server can reach on its own LAN. The tailnet is the one thing bounded here rather than open, because
+the policy denies the server as a source — but that is a single control, and everything else on this
+list is untouched by it.
 
 So every other project goes in a sandbox. Not "usually" — every one. The exception you make because
 a change is small, or because starting a sandbox is a faff right now, is the one that removes the
@@ -162,6 +164,16 @@ That last part matters more than it first appears. The server is itself a Tailsc
 it a compromised agent would inherit reach into your private network — your laptop, other machines on
 the tailnet, anything on the LAN. That was the surprise specific to this design, and it is now
 structural rather than something we maintain.
+
+The tailnet half is blocked twice, on purpose. The policy in
+[`shared-setup.md`](shared-setup.md) names no rule with `tag:host` as a source, so the server cannot
+open a connection to a device you own — from a sandbox, from the host, as root, or after everything
+else here has failed. Tailscale enforces that on the receiving device, which makes it the one control
+in this design a compromised server cannot switch off, and the one that covers the host rather than
+only the sandbox.
+
+The LAN half is not doubled. ACLs govern the tailnet, not the subnet the Mac is plugged into, so for
+anything on that network the sandbox boundary is all there is.
 
 Verify it rather than trusting it. `have-agent-sandbox`'s verify creates a probe sandbox and removes
 it; if you want to check egress by hand, try reaching a `100.64.x.x` address from inside one and
