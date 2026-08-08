@@ -113,6 +113,19 @@ The `tests` block is what makes this durable. Tailscale runs it on every save an
 policy if the assertion fails, so a future edit that accidentally grants the server reach is
 refused rather than accepted quietly. Fill in the `hosts` entry or the test cannot run.
 
+`tag:host` names a role — a machine this cookbook manages — and not a particular machine. Every
+server gets the same one. That is what lets a single reusable key provision the next server with
+no policy edit, and one ACL rule cover all of them. Naming a tag after a machine costs you both
+and buys nothing: a device is already addressable by its name and tailnet IP, so the tag is not
+how you identify it. It also multiplies the one mistake this policy exists to prevent, since the
+protection is an absence — no rule naming the tag as a source — and every extra tag is another
+place to forget it. Add a second tag when servers need different rules, `tag:exit-node` for the
+ones that route traffic, and keep it a role rather than a name.
+
+The `hosts` alias is the opposite case, which is why it is prompted for and this is not: it maps
+to one device's IP, so it has to be chosen per device, and nothing outside the policy file reads
+it. The tag is read by `join-tailnet` and by every rule here.
+
 Two things this does not cover, both worth knowing rather than discovering:
 
 - Exit-node traffic. Routing through the server means the server handles your traffic — that is
