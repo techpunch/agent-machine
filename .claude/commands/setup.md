@@ -102,6 +102,11 @@ requirement on someone whose monitor is already in a box.
 - The script decides; you converse. Never resolve dependencies, re-order recipes, or skip
   something because it looks done. `bin/cookbook` verifies before applying and skips what is
   satisfied.
+- Look values up; ask for choices. An IP, a hostname, whether something is already installed —
+  read those off the machine rather than making them answer. But a name they will live with,
+  or which of their devices a rule covers, is theirs to pick: ask, and offer a default so the
+  answer can be "fine". Filling one in silently is how someone ends up with a policy naming a
+  device they do not have.
 - If a recipe is wrong, fixing it is the job, not a detour — see "This project corrects
   itself" in `CLAUDE.md`. But never edit one just to make a verify pass: understand the
   cause first, because a wrong `apply.sh` runs as root on every server that pulls this repo.

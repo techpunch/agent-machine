@@ -18,9 +18,14 @@ The policy, and the reasoning for each line, is in `docs/shared-setup.md` under 
 
 Access controls has two editors. Use the JSON one and replace the entire file contents, not the
 visual editor and not one rule inside it — the allow-all you are removing is the whole default
-policy, so editing a single rule leaves the rest of it in place. Fill in the one host entry and
-save. Tailscale validates on save and rejects the policy if the test fails, so a mistake here
-fails loudly rather than silently leaving you open.
+policy, so editing a single rule leaves the rest of it in place. Save when done. Tailscale
+validates on save and rejects the policy if the test fails, so a mistake here fails loudly
+rather than silently leaving you open.
+
+Two values are yours, so ask rather than filling them in for someone: which devices the test
+should prove are unreachable, and what to call each one. The alias is referenced by the tests
+block and nothing else, so any name works; offer `client1` and number upwards from there. Their
+tailnet IPs come from `tailscale status`, so read those rather than asking for them.
 
 The policy is written in `acls` syntax, which Tailscale still supports. Open it in the visual
 editor later and Tailscale rewrites it as grants; that is a change of notation, not of meaning.

@@ -65,8 +65,10 @@ are removing is the entire default policy, not a single rule you can edit in the
   },
 
   "hosts": {
-    // Any device you want the test below to prove is unreachable from a server.
-    "laptop": "<FILL IN — your laptop's tailnet IP, e.g. 100.101.102.103>",
+    // Any device you want the test below to prove is unreachable from a server. The alias is
+    // yours to choose and is referenced by the tests block; client1, client2 numbers upwards as
+    // you add devices. Add a line per device you care about.
+    "client1": "<FILL IN — that device's tailnet IP, e.g. 100.101.102.103>",
   },
 
   "acls": [
@@ -101,7 +103,7 @@ are removing is the entire default policy, not a single rule you can edit in the
   "tests": [
     {
       "src":  "tag:host",
-      "deny": ["laptop:22", "laptop:5900"],
+      "deny": ["client1:22", "client1:5900"],
     },
   ],
 }
