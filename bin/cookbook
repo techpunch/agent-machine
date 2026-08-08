@@ -414,7 +414,7 @@ cmd_log() {
 # it can sit on the server and be fetched over ssh. Generated rather than written by hand so
 # it cannot quietly go stale; regenerate it after any run that changes something.
 cmd_record() {
-  local out="$STATE_DIR/server-record.md" cli="" dns="" fv=""
+  local out="$STATE_DIR/server-record-${SERVER_SLUG:-unnamed}.md" cli="" dns="" fv=""
   mkdir -p "$STATE_DIR"
   cli=$(ts_cli 2>/dev/null) || cli=""
   if [ -n "$cli" ]; then
@@ -465,6 +465,8 @@ cmd_record() {
     printf '   the token inside the sandbox.\n\n'
 
     printf '## Fetching this from another machine\n\n'
+    printf 'This doubles as the remote-access smoke test. If it works from your laptop, ssh,\n'
+    printf 'the tailnet and the ACL are all fine — and you end up holding the off-server copy.\n\n'
     printf '```\nscp %s@%s:%s .\n```\n' \
       "${ADMIN_USER:-<user>}" "${dns:-${TS_IP:-<host>}}" "$out"
   } >"$out"

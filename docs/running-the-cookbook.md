@@ -22,7 +22,7 @@ writes the ledger and the log:
 ./bin/cookbook record               # write the record you keep a copy of elsewhere
 ```
 
-`record` writes `~/.agent-machine/server-record.md` from `server.env` and the ledger — what the
+`record` writes `~/.agent-machine/server-record-<slug>.md` from `server.env` and the ledger — what the
 machine is, what is applied, where its secrets live (pointers, never values), and how to revoke
 access. It is a snapshot, so re-run it after anything that changes the server. Set
 `SERVER_LOCATION` in `server.env` to have it record where the box physically sits.

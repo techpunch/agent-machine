@@ -70,7 +70,7 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
      they will want when something misbehaves in three weeks.
 
    - The server's own record. Run `./bin/cookbook record`, which writes
-     `~/.agent-machine/server-record.md` from `server.env` and the ledger: name and slug,
+     `~/.agent-machine/server-record-<slug>.md` from `server.env` and the ledger: name and slug,
      admin user, tailnet name and IP, FileVault state, what is applied, pointers to where the
      secrets live, and how to revoke access. Do not assemble this by hand — a hand-written
      copy is stale by the next run, and the point of generating it is that it never is.

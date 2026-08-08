@@ -111,6 +111,7 @@ _log_rotate() {
 # Appending instead would turn the ledger into a second, worse copy of run.log, and the
 # whole reason both files exist is that they answer different questions — this one answers
 # "what is this machine", the log answers "what happened to it".
+
 # True when the ledger already carries a row for this recipe.
 ledger_has() { [ -f "$SERVER_LEDGER" ] && /usr/bin/grep -q "^| ${1} |" "$SERVER_LEDGER"; }
 
@@ -214,7 +215,7 @@ with_timeout() {
 # them, which would leave verify comparing against a name that can never match. Every
 # machine-facing name is derived from SERVER_NAME through here instead.
 # Apostrophes disappear rather than becoming separators. macOS derives LocalHostName from
-# ComputerName that way — "Alpha's Mac mini" gives "Alphas-Mac-mini", not "Alpha-s-Mac-mini" —
+# ComputerName that way — "Ada's Mac mini" gives "Adas-Mac-mini", not "Ada-s-Mac-mini" —
 # and Tailscale names a node the same. Turning one into a hyphen put the slug out of step with
 # both, and join-tailnet then failed forever against a node name it cannot change: Tailscale
 # keeps the name a node registered under, so --hostname does not rename an existing one.
