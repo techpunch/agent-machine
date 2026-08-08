@@ -70,6 +70,7 @@ finished step is a no-op.
 | Route your traffic through it | Use it as a Tailscale exit node on untrusted wifi |
 | Run coding agents on it | WIP - A microVM per agent, egress under policy, nothing shared with the Mac |
 | Drive many projects at once | WIP - A persistent terminal grid you attach to from anywhere |
+| Stop running what nobody uses | Spotlight, screen saver and desktop widgets off, so agents get the CPU |
 
 ## Keep a copy of the details off the server
 
