@@ -70,6 +70,11 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
    `~/.ssh/config` alias in the record supplies the user, so the long form is noise they
    would have to type or paste every time. Give them the alias first, then use it throughout.
 
+   Say which machine each command runs on, every time. A list that goes `ssh <slug>` and then
+   `scp <slug>:...` reads as one session, but the second runs on the client — and a `mkdir`
+   that makes sense on a laptop looks absurd typed on the server, where that directory is the
+   state dir already. Label the client commands as client commands.
+
    - The run log, at `~/.agent-machine/run.log` — every action, gate and failure, with
      timestamps. `./bin/cookbook log` shows the tail. Tell them where it is; it is the thing
      they will want when something misbehaves in three weeks.

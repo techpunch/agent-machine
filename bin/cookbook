@@ -472,12 +472,16 @@ cmd_record() {
       "${SERVER_SLUG:-<slug>}" "${dns:-${TS_IP:-<host>}}" "${ADMIN_USER:-<user>}"
     printf 'The full name is in `HostName` so the alias keeps working if MagicDNS is ever off.\n\n'
 
-    printf '## Reaching it\n\n'
+    printf '## Reaching it, from a client\n\n'
     printf '```\nssh %s\n```\n\n' "${SERVER_SLUG:-<slug>}"
 
-    printf '## Fetching this from another machine\n\n'
-    printf 'This doubles as the remote-access smoke test. If it works from your laptop, ssh,\n'
-    printf 'the tailnet and the ACL are all fine — and you end up holding the off-server copy.\n\n'
+    printf '## Fetching this, from a client\n\n'
+    printf 'Run this on the laptop, not on the server and not after ssh-ing in — scp is the\n'
+    printf 'client pulling the file across, so both paths below are read from the client end.\n'
+    printf 'The `mkdir` is for the client, where `~/.agent-machine/` will not exist yet; on this\n'
+    printf 'server that directory is already the state dir this record came out of.\n\n'
+    printf 'It doubles as the remote-access smoke test. If it works, ssh, the tailnet and the\n'
+    printf 'ACL are all fine — and you are left holding the off-server copy.\n\n'
     printf '```\nmkdir -p ~/.agent-machine\nscp %s:%s ~/.agent-machine/\n```\n\n' \
       "${SERVER_SLUG:-<slug>}" "$out"
     printf 'Without the alias, MagicDNS still resolves the short name; you just supply the\n'
