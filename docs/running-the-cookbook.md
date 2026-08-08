@@ -21,6 +21,55 @@ writes the ledger and the log:
 ./bin/cookbook log                  # every action and result, with timestamps
 ```
 
+Run `apply` from a terminal. sudo prompts on `/dev/tty`, so a plan containing a root recipe needs
+a session that has one — Terminal.app on the server, or ssh. Claude Code's shell does not qualify,
+and neither does its `!` prefix, so an agent driving this hands the apply to a human and reads the
+output. Everything else here is read-only and runs anywhere. `apply` checks for a usable terminal
+before it starts, rather than failing at the first root recipe with sudo's own error.
+
+## Letting an agent run the applies
+
+Optional. sudo needs `/dev/tty` only in order to ask for a password, so anything that answers the
+password some other way lets Claude Code drive the whole run — applies, gates, re-runs — instead
+of handing a command back at every root recipe. The driver's terminal check keys off
+`sudo -n true`, so it stands down by itself once one of these is in place.
+
+By default sudo keeps a separate credential record per terminal, which is why authenticating in
+Terminal.app does nothing for an agent's session. `timestamp_type=global` makes one record cover
+all of a user's login sessions. The human still types the password; it just counts everywhere.
+
+Install it in a terminal, then authenticate:
+
+```
+printf 'Defaults timestamp_type=global\nDefaults timestamp_timeout=30\n' > /tmp/am-sudo-timestamp
+sudo visudo -cf /tmp/am-sudo-timestamp && sudo install -m 440 -o root -g wheel /tmp/am-sudo-timestamp /etc/sudoers.d/agent-machine-setup
+sudo -v
+```
+
+Validate before installing, as above. A malformed sudoers file can lock you out of sudo entirely,
+and a separate file under `sudoers.d` keeps the damage to something you can delete. The timeout is
+minutes, 5 by default; 30 covers a working session without leaving the window open all day.
+
+Remove it when the run is done, and confirm with `ls /etc/sudoers.d/`:
+
+```
+sudo rm /etc/sudoers.d/agent-machine-setup
+```
+
+What this costs: for the length of the window, any process running as that user can sudo without
+a password, not just the cookbook. What it does not cost is a standing grant — the file alone
+authorizes nothing, so forgetting to remove it leaves sudo credentials un-scoped from the terminal
+rather than leaving the machine passwordless. That asymmetry is why this is the documented option.
+
+Two alternatives, and why they are not:
+
+- `NOPASSWD` for the admin user. Simpler, and strictly worse: it grants root with no human in the
+  loop at all, for as long as the file exists. Scoping it to the recipe scripts rather than `ALL`
+  looks tighter but is not, since the scripts live in a repo the same user can write to.
+- A `SUDO_ASKPASS` helper that pops a GUI password dialog. Tightest of the three while a screen is
+  attached, and a trap afterwards: on a headless server the dialog waits forever with nobody to
+  answer it, which is the exact hang recipes are written to avoid.
+
 Goals and recipe names are interchangeable as arguments — `apply run-agents` and
 `apply have-agent-sandbox` both work. Goals are the human-facing names, and several can be given at
 once: they resolve into one correctly-ordered run rather than several overlapping ones.

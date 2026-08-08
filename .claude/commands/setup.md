@@ -37,7 +37,14 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
      it worked afterwards.
 
 5. Show `./bin/cookbook plan <goals>` as a short summary of what is about to happen and
-   roughly how long, then run `./bin/cookbook apply <goals>`.
+   roughly how long, then apply.
+
+   Most plans include a root recipe, and sudo prompts on `/dev/tty`, which Claude Code's
+   shell does not have — with or without a leading `!`. So hand the user the command to run
+   in a terminal window on the server, rather than running it yourself and hitting the
+   guard. Ask them to paste the output back; read it and carry on from there.
+
+       ./bin/cookbook apply <goals>
 
 6. Handle what comes back:
 

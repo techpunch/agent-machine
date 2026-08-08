@@ -13,7 +13,10 @@ Two ways you will be working in it, and they are different jobs:
 - Driving a server. Claude Code runs on the server itself, in yolo mode, in a clone of this repo.
   `bin/cookbook` does the resolving, applying, and recording — always call it rather than running
   recipe scripts by hand or re-deriving the dependency order yourself. `/cookbook` and `/cook` wrap
-  it and say what your part is.
+  it and say what your part is. The one thing you cannot do is run an `apply` that needs root:
+  sudo prompts on `/dev/tty` and Claude Code's shell has none, `!` prefix included. Hand that
+  command to the user to run in a terminal and read back what it prints. Everything else —
+  verifying, planning, diagnosing, fixing — is yours.
 - Editing the cookbook. Adding or fixing a recipe, which every server will pull. Higher stakes than
   editing a doc — a wrong `apply.sh` runs as root on every server that pulls it.
 
@@ -174,6 +177,9 @@ them. A new recipe that needs a secret should use it rather than reading an env 
 
 1. The Keychain, for anything reusable. Stored once with a prompting `security add-generic-password`,
    fetched silently after. Use `secret_store_hint` in gate text so every recipe says the same thing.
+   That store command reads its prompt from stdin, so unlike an `apply` needing root it does work
+   from Claude Code's shell — the missing `/dev/tty` blocks sudo specifically, not prompting in
+   general. The user still runs it themselves, so the secret stays out of the transcript.
 2. An interactive prompt the human runs, for a secret that unlocks the machine itself. `make-auto-login`
    is the example: it gates with a `sysadminctl ... -password -` command rather than accepting the
    password at all.

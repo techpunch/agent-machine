@@ -5,9 +5,14 @@ argument-hint: <recipe-name>
 
 Apply `$1` on this server.
 
-Show the user `./bin/cookbook plan $1` first, then run `./bin/cookbook apply $1`. The script resolves
-prerequisites, skips what is already satisfied, applies the rest in order, re-verifies, and writes
-the ledger. Do not do any of that by hand.
+Show the user `./bin/cookbook plan $1` first, then apply. The script resolves prerequisites, skips
+what is already satisfied, applies the rest in order, re-verifies, and writes the ledger. Do not do
+any of that by hand.
+
+If the plan needs root, you cannot run the apply. sudo prompts on `/dev/tty`, and Claude Code's
+shell has none — a leading `!` does not change that. Give the user `./bin/cookbook apply $1` to run
+in a terminal on the server and ask for the output. The driver checks this before starting, so a
+plan with no root recipe you can still run yourself.
 
 What you own is everything the script cannot decide:
 

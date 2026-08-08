@@ -28,6 +28,19 @@ RECIPES_DIR="$COOKBOOK_DIR/recipes"
 GOALS_DIR="$COOKBOOK_DIR/goals"
 PREREQS_DIR="$COOKBOOK_DIR/prereqs"
 
+# The sudo drop-in (docs/running-the-cookbook.md) is meant to last one run, and the only thing
+# between "temporary" and "permanent" is somebody remembering to undo it. An agent's memory is
+# not a control — a session can end mid-run — so the driver says it instead, on every command
+# and every exit path, until the file is gone. Deliberately vague about what the file contains:
+# it is whatever was installed to let an agent drive applies, and all of those want removing.
+TEMP_SUDO_FILE=/etc/sudoers.d/agent-machine-setup
+warn_temp_sudo() {
+  [ -e "$TEMP_SUDO_FILE" ] || return 0
+  printf "\nnote: this run's temporary sudo drop-in is still installed.\n" >&2
+  printf '      Remove it when you are done:  sudo rm %s\n' "$TEMP_SUDO_FILE" >&2
+}
+trap warn_temp_sudo EXIT
+
 # Secrets reach a root recipe as `sudo VAR=value ...`, so they never land in server.env.
 # This is the escape hatch, not the default — it is visible in ps for the life of the
 # command. The default is the Keychain, via secret_get in lib/common.sh.
@@ -381,6 +394,29 @@ cmd_apply() {
       exit 2
     fi
   done
+
+  # sudo prompts on a terminal, and there is not always one. Claude Code runs commands through
+  # a pipe, so a root recipe fails on "a terminal is required to read the password" partway into
+  # the plan — after the run has started, with sudo's error and no hint of what to do. Driving a
+  # server from Claude Code is the normal case here, so check before anything runs and say the
+  # fix. SUDO_ASKPASS means something else can answer, so leave that alone.
+  local needs_sudo=false root_recipes=""
+  for r in $order; do
+    if needs_root "$r"; then needs_sudo=true; root_recipes="$root_recipes $r"; fi
+  done
+  # Test what sudo actually needs — an openable /dev/tty — not whether stdin is a terminal.
+  # sudo prompts on /dev/tty regardless of its own stdin, so `[ -t 0 ]` rejects working setups.
+  if $needs_sudo && ! is_root && [ -z "${SUDO_ASKPASS:-}" ] \
+     && ! (: </dev/tty) 2>/dev/null \
+     && ! /usr/bin/sudo -n true 2>/dev/null; then
+    printf 'error: this plan needs sudo, and there is no terminal here to type a password into.\n' >&2
+    printf '  needs root:%s\n' "$root_recipes" >&2
+    printf '  Run it in a terminal window on the server — Terminal.app, or an ssh session:\n' >&2
+    printf '      ./bin/cookbook apply %s\n' "$target" >&2
+    printf "  Claude Code's own shell is not one, with or without a leading !, so a run driven\\n" >&2
+    printf '  from inside Claude Code stops here rather than failing at the first root recipe.\n' >&2
+    exit 1
+  fi
 
   printf 'plan: %s\n\n' "$(printf '%s ' $order)"
   log_event run-start "$target" "plan: $(printf '%s ' $order)"
