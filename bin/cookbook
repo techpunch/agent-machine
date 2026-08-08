@@ -464,13 +464,15 @@ cmd_record() {
     printf '3. If agents were set up: sign out everywhere from the agent Claude account, to kill\n'
     printf '   the token inside the sandbox.\n\n'
 
-    printf '## First, an alias on each client\n\n'
-    printf 'Add this to `~/.ssh/config` on any machine you drive this server from. After it,\n'
-    printf 'every command below is just `%s` — no user, no domain — and the same alias\n' "${SERVER_SLUG:-<slug>}"
-    printf 'works for scp, rsync and git over ssh.\n\n'
+    printf '## Once per client\n\n'
+    printf 'Add this to `~/.ssh/config` on each machine you drive this server from. Your login\n'
+    printf 'name on a laptop is usually not the server'"'"'s admin user, and MagicDNS resolves the\n'
+    printf 'short name but says nothing about who you log in as — so without this every command\n'
+    printf 'carries an unnecessary `%s@`. scp, rsync and git over ssh pick it up too.\n\n' \
+      "${ADMIN_USER:-<user>}"
     printf '```\nHost %s\n    HostName %s\n    User %s\n```\n\n' \
       "${SERVER_SLUG:-<slug>}" "${dns:-${TS_IP:-<host>}}" "${ADMIN_USER:-<user>}"
-    printf 'The full name is in `HostName` so the alias keeps working if MagicDNS is ever off.\n\n'
+    printf 'The full name is in `HostName`, so it keeps working if MagicDNS is ever turned off.\n\n'
 
     printf '## Reaching it, from a client\n\n'
     printf '```\nssh %s\n```\n\n' "${SERVER_SLUG:-<slug>}"
@@ -484,12 +486,15 @@ cmd_record() {
     printf 'ACL are all fine — and you are left holding the off-server copy.\n\n'
     printf '```\nmkdir -p ~/.agent-machine\nscp %s:%s ~/.agent-machine/\n```\n\n' \
       "${SERVER_SLUG:-<slug>}" "$out"
-    printf 'Without the alias, MagicDNS still resolves the short name; you just supply the\n'
-    printf 'user: `%s@%s`.\n\n' "${ADMIN_USER:-<user>}" "${SERVER_SLUG:-<slug>}"
-    printf 'Land it in `~/.agent-machine/` on the client, the same directory name a server uses\n'
+    printf 'It lands in `~/.agent-machine/` on the client, the same directory name a server uses\n'
     printf 'for its own state. Then there is one place to look on any machine you own, and a\n'
     printf 'client that reaches several servers collects one record per server rather than\n'
-    printf 'scattering them through whichever directory you happened to be in.\n'
+    printf 'scattering them through whichever directory you happened to be in.\n\n'
+
+    printf '## On a client without the alias\n\n'
+    printf 'Spell out the user: `%s@%s`. The short name still resolves — that part\n' \
+      "${ADMIN_USER:-<user>}" "${SERVER_SLUG:-<slug>}"
+    printf 'is MagicDNS, and it is on by default — it is only the login name that is missing.\n'
   } >"$out"
 
   _own_state_dir

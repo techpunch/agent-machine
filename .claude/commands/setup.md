@@ -66,9 +66,15 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
    need later and will not think to ask about:
 
    Use the server's short name in every command you show them — `ssh <slug>`, never
-   `ssh <user>@<slug>.<tailnet>.ts.net`. MagicDNS resolves the short name, and the
-   `~/.ssh/config` alias in the record supplies the user, so the long form is noise they
-   would have to type or paste every time. Give them the alias first, then use it throughout.
+   `ssh <user>@<slug>.<tailnet>.ts.net`. MagicDNS is on by default and resolves the short
+   name from any client taking Tailscale DNS, so the domain is noise they would retype
+   every time.
+
+   MagicDNS says nothing about who they log in as, though, and a laptop's login name is
+   usually not the server's admin user. So give them the `~/.ssh/config` alias from the
+   record first, as a once-per-client step, and every command after it is one word. Do not
+   assume the names match — check, or use the alias, rather than handing them a `ssh <slug>`
+   that fails on a machine you never looked at.
 
    Say which machine each command runs on, every time. A list that goes `ssh <slug>` and then
    `scp <slug>:...` reads as one session, but the second runs on the client — and a `mkdir`
