@@ -2,7 +2,17 @@
 . "$(dirname "$0")/../../lib/common.sh"
 
 [ -f "$SERVER_ENV" ] && ok "server.env exists at $SERVER_ENV" || miss "server.env not found at $SERVER_ENV"
-[ -f "$SERVER_LEDGER" ] && ok "ledger exists at $SERVER_LEDGER" || miss "ledger not found at $SERVER_LEDGER"
+if [ ! -f "$SERVER_LEDGER" ]; then
+  miss "ledger not found at $SERVER_LEDGER"
+# The heading is the ledger's only claim about which machine it describes, and a rename
+# leaves it naming the old one. Checked here rather than assumed, because a server set up
+# before apply learned to retitle keeps the stale name for good otherwise — apply never runs
+# again on a recipe that verifies clean.
+elif [ -n "${SERVER_NAME:-}" ] && [ "$(/usr/bin/head -1 "$SERVER_LEDGER")" != "# $SERVER_NAME" ]; then
+  miss "ledger at $SERVER_LEDGER is titled '$(/usr/bin/head -1 "$SERVER_LEDGER")', not '# $SERVER_NAME'"
+else
+  ok "ledger exists at $SERVER_LEDGER"
+fi
 
 if [ -n "${SERVER_NAME:-}" ]; then
   ok "SERVER_NAME=$SERVER_NAME"

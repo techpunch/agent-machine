@@ -34,6 +34,18 @@ note "adopted SERVER_NAME=$name SERVER_SLUG=$slug ADMIN_USER=$admin"
   note "created ledger at $SERVER_LEDGER"
 }
 
+# The heading carries the server's name, and a server gets renamed after the ledger exists
+# more often than not — this recipe is itself what renames a Mac whose GUI name was never
+# meant to be a hostname. Seeded once and left alone, the recovery document's title names a
+# machine that stopped answering to it. Rewrite the one line, never the file: the rows below
+# it are the record.
+if [ -f "$SERVER_LEDGER" ] && [ "$(/usr/bin/head -1 "$SERVER_LEDGER")" != "# $name" ]; then
+  tmp="$SERVER_LEDGER.tmp.$$"
+  { printf '# %s\n' "$name"; /usr/bin/tail -n +2 "$SERVER_LEDGER"; } >"$tmp" \
+    && /bin/mv "$tmp" "$SERVER_LEDGER"
+  note "retitled ledger to '$name'"
+fi
+
 # Make the three scutil names agree. A GUI-named Mac routinely has a LocalHostName that
 # differs, and Tailscale + SSH + Screen Sharing all key off different ones.
 host=$(/usr/sbin/scutil --get HostName 2>/dev/null || true)
