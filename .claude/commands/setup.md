@@ -65,6 +65,11 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
    `sbx run --clone claude` to put one project in its own sandbox. Then two things they will
    need later and will not think to ask about:
 
+   Use the server's short name in every command you show them — `ssh <slug>`, never
+   `ssh <user>@<slug>.<tailnet>.ts.net`. MagicDNS resolves the short name, and the
+   `~/.ssh/config` alias in the record supplies the user, so the long form is noise they
+   would have to type or paste every time. Give them the alias first, then use it throughout.
+
    - The run log, at `~/.agent-machine/run.log` — every action, gate and failure, with
      timestamps. `./bin/cookbook log` shows the tail. Tell them where it is; it is the thing
      they will want when something misbehaves in three weeks.
