@@ -26,3 +26,16 @@ fi
 
 eval "$("$brew" shellenv)"
 ok "$("$brew" --version | head -1)"
+
+# Off by choice rather than by default. A server installs a handful of formulae and then runs for
+# months; nothing about that needs reporting to anyone. Logged with its previous value, like every
+# other setting this cookbook changes, so `cookbook log` says what the machine used to do.
+analytics=$(HOMEBREW_NO_AUTO_UPDATE=1 "$brew" analytics state 2>/dev/null) || analytics=""
+case "$analytics" in
+  *"analytics are disabled"*)
+    ok "brew analytics already off" ;;
+  *)
+    "$brew" analytics off
+    log_event tuned "brew analytics" "off (was on)"
+    ok "brew analytics off" ;;
+esac

@@ -98,8 +98,10 @@ In case you're curious to know more about how it works and the internals:
 - [`docs/shared-setup.md`](docs/shared-setup.md) — accounts and tailnet, once before the first server.
 - [`CLAUDE.md`](CLAUDE.md) — repo layout and how to write a recipe.
 
-Not built yet: encryption at rest that survives an unattended reboot. It carries a contract in
-`recipes/make-data-encrypted/` explaining what it is waiting on.
+Not built yet, each carrying a contract in its recipe directory explaining what it is waiting on:
+encryption at rest that survives an unattended reboot (`recipes/make-data-encrypted/`), and stopping
+macOS from installing an update and rebooting out from under running agents
+(`recipes/make-updates-manual/`, which also tells you how to do it by hand meanwhile).
 
 ## License
 

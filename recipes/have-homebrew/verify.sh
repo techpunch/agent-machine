@@ -25,6 +25,16 @@ fi
 # Match the specific brew, not the string "brew shellenv". With two installs present, a
 # line pointing at the other prefix passes a substring check while putting the wrong brew
 # on PATH for every login shell — including the ones later recipes run in.
+# Homebrew reports to InfluxDB on every command unless told not to. Read the state through brew's
+# own CLI rather than a config file, whose location has moved between versions. NO_AUTO_UPDATE
+# because a verify has to stay cheap: without it this can trigger a full metadata refresh.
+analytics=$(HOMEBREW_NO_AUTO_UPDATE=1 "$brew" analytics state 2>/dev/null) || analytics=""
+case "$analytics" in
+  *"analytics are disabled"*) ok "brew analytics off" ;;
+  *"analytics are enabled"*)  miss "brew analytics on — brew reports home on every command" ;;
+  *)                          skip "could not read brew analytics state" ;;
+esac
+
 profile="$(_admin_home)/.zprofile"
 if grep -q "$brew shellenv" "$profile" 2>/dev/null; then
   ok "shellenv line for $brew present in $profile"
