@@ -15,9 +15,15 @@ one the server cannot switch off, because Tailscale enforces it on the receiving
 than on the sender.
 
 The policy, and the reasoning for each line, is in `docs/shared-setup.md` under "Tailnet policy".
-Paste it into Access Controls, fill in the one host entry, and save. Tailscale validates it on
-save and rejects it if the test fails, so a mistake here fails loudly rather than silently
-leaving you open.
+
+Access controls has two editors. Use the JSON one and replace the entire file contents, not the
+visual editor and not one rule inside it — the allow-all you are removing is the whole default
+policy, so editing a single rule leaves the rest of it in place. Fill in the one host entry and
+save. Tailscale validates on save and rejects the policy if the test fails, so a mistake here
+fails loudly rather than silently leaving you open.
+
+The policy is written in `acls` syntax, which Tailscale still supports. Open it in the visual
+editor later and Tailscale rewrites it as grants; that is a change of notation, not of meaning.
 
 What it costs you: nothing this cookbook does. The server accepts SSH and Screen Sharing, serves
 as an exit node, and reaches the internet exactly as before — ACLs govern traffic between tailnet

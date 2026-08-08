@@ -55,6 +55,9 @@ Traffic goes one way: your devices reach the server, the server reaches nothing.
 
 Write this before the first server joins, so there is never a window where it has full reach.
 
+Access controls has two editors. Use the JSON one and replace the whole file — the allow-all you
+are removing is the entire default policy, not a single rule you can edit in the visual editor.
+
 ```json
 {
   "tagOwners": {
