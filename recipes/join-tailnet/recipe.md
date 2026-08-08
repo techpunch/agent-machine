@@ -30,6 +30,11 @@ node name and IP.
 A tagged node is owned by the tailnet rather than by a user and has key expiry disabled, which is
 why the server stays connected across reboots instead of dropping off in 90 days.
 
+The macOS menu bar shows an email address under the device name. That is the tailnet's name — a
+personal tailnet is named after the account that created it — not a login on this machine. Check
+with `tailscale switch --list`: the Account column is the node's identity, and on a tagged node it
+is the machine.
+
 The `tag:host` tag, its owner, and the reusable key are shared setup done once — see
 `docs/shared-setup.md`. The host is the only tailnet node on the server: agent sandboxes cannot
 reach the tailnet at all, since their egress policy blocks private ranges outright.
