@@ -210,8 +210,16 @@ with_timeout() {
 # HostName, and Tailscale hostnames may not — macOS and Tailscale both silently rewrite
 # them, which would leave verify comparing against a name that can never match. Every
 # machine-facing name is derived from SERVER_NAME through here instead.
+# Apostrophes disappear rather than becoming separators. macOS derives LocalHostName from
+# ComputerName that way — "Alpha's Mac mini" gives "Alphas-Mac-mini", not "Alpha-s-Mac-mini" —
+# and Tailscale names a node the same. Turning one into a hyphen put the slug out of step with
+# both, and join-tailnet then failed forever against a node name it cannot change: Tailscale
+# keeps the name a node registered under, so --hostname does not rename an existing one.
+# The curly form is spelled in bytes because BSD sed has no \x escape and the C locale would
+# otherwise treat it as three separate characters.
 slugify() {
   printf '%s' "$1" \
+    | /usr/bin/sed -e "s/'//g" -e $'s/\xe2\x80\x99//g' -e $'s/\xe2\x80\x98//g' \
     | /usr/bin/tr '[:upper:]' '[:lower:]' \
     | /usr/bin/sed -e 's/[^a-z0-9-]/-/g' -e 's/--*/-/g' -e 's/^-//' -e 's/-$//'
 }
