@@ -31,6 +31,35 @@ along the way only when it needs to.
 
 You can stop reading now if you'd like and just do it.
 
+### Optional: bring your own shell setup
+
+Personal, and nothing in this project depends on it. If you keep your dotfiles and Claude config in
+repos, lay them down on the fresh box *before* the clone above, so the machine is already yours by
+the time `/setup` runs.
+
+```
+git clone https://github.com/bobfejes/homedir.git ~/homedir
+cd ~/homedir && find . -maxdepth 1 -mindepth 1 -exec mv {} .. \;
+
+cd ~ && git clone https://github.com/bobfejes/claude-clojure-plus.git .claude
+```
+
+Read these before running it. Both commands overwrite, and neither asks:
+
+- The `find` moves everything up into your home directory including `.git`, so `~` itself becomes
+  the `homedir` working tree afterwards. That is the point of the pattern, not an accident — but it
+  does mean `git status` anywhere in your home directory is now about your dotfiles.
+- A **file** that already exists is replaced with no prompt. On a Mac that has been used at all,
+  `~/.zshrc`, `~/.gitconfig` and `~/.zprofile` are the usual casualties.
+- A **directory** that already exists is not replaced — `mv` moves the source *inside* it, so an
+  existing `~/.config` leaves you with `~/.config/.config`. Look before you leap on a box that is
+  not brand new.
+- The second clone needs `~/.claude` to be absent or empty; git refuses to clone into a non-empty
+  directory rather than merging. If Claude Code has ever run on this machine, move the old one aside
+  first — that directory is where its login and settings live.
+
+On a genuinely fresh Mac none of these bite. On a machine you have already been using, check first.
+
 ## What `/setup` does
 
 It's a conversation that gets you to your end goal machine state as quickly as possible.
