@@ -31,6 +31,10 @@ Keeping it on the server is what lets another machine fetch it over ssh, and the
 the `scp` line for that. Keeping it *only* there is the mistake: every reason to read it is a
 reason the server cannot be reached, so the copy that counts lives somewhere else.
 
+That `scp` lands the file in `~/.agent-machine/` on the client — the same directory name a server
+uses for its own state, so there is one place to look on any machine you own, and a laptop that
+reaches several servers ends up holding one record each rather than scattering them.
+
 Run `apply` from a terminal. sudo prompts on `/dev/tty`, so a plan containing a root recipe needs
 a session that has one — Terminal.app on the server, or ssh. Claude Code's shell does not qualify,
 and neither does its `!` prefix, so an agent driving this hands the apply to a human and reads the

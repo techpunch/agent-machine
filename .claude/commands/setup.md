@@ -88,6 +88,12 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
      note on the laptop or phone they already use as a client. Not in this repo, which is
      shared and pushed, and never inside an agent sandbox, where anything can leave.
 
+     Have them run that `scp` from a client machine, not from the server: it is the honest
+     test that remote access works, and it leaves the off-server copy behind as a side effect
+     rather than as a chore. Tell them where it lands — `~/.agent-machine/` on the client,
+     the same directory name a server uses — so a year from now there is one place to look,
+     on whichever machine they are holding.
+
      Tell them to re-run `./bin/cookbook record` after any later run, since it is a snapshot.
 
 ## Timing is the point

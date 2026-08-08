@@ -467,8 +467,12 @@ cmd_record() {
     printf '## Fetching this from another machine\n\n'
     printf 'This doubles as the remote-access smoke test. If it works from your laptop, ssh,\n'
     printf 'the tailnet and the ACL are all fine — and you end up holding the off-server copy.\n\n'
-    printf '```\nscp %s@%s:%s .\n```\n' \
+    printf '```\nmkdir -p ~/.agent-machine\nscp %s@%s:%s ~/.agent-machine/\n```\n\n' \
       "${ADMIN_USER:-<user>}" "${dns:-${TS_IP:-<host>}}" "$out"
+    printf 'Land it in `~/.agent-machine/` on the client, the same directory name a server uses\n'
+    printf 'for its own state. Then there is one place to look on any machine you own, and a\n'
+    printf 'client that reaches several servers collects one record per server rather than\n'
+    printf 'scattering them through whichever directory you happened to be in.\n'
   } >"$out"
 
   _own_state_dir
