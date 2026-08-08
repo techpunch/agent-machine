@@ -47,6 +47,17 @@ for d in recipes/*/; do
   [ "$(key name)" = "$r" ] || fail "$r: name in frontmatter is '$(key name)'"
   [ -n "$(key summary)" ]  || fail "$r: no summary"
 
+  # verify_root falls back to root: for anything it does not recognise, so a typo does not fail —
+  # it silently keeps sudo'ing a verify that never needed it, which is the bug this field exists to
+  # fix and is invisible from the output.
+  case "$(key verify_root)" in
+    ''|yes|no) ;;
+    *) fail "$r: verify_root='$(key verify_root)' (must be yes or no; absent inherits root:)" ;;
+  esac
+  if [ "$(key verify_root)" = no ] && [ "$(key root)" != yes ]; then
+    fail "$r: verify_root: no on a recipe that is not root: yes — it says nothing"
+  fi
+
   # A blocked recipe must have no scripts, and a ready one must have both.
   if [ "$(key status)" = "blocked" ]; then
     [ -n "$(key blocked_by)" ] || fail "$r: blocked with no blocked_by"

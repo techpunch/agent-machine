@@ -3,6 +3,7 @@ name: have-server-identity
 summary: Adopt the machine's existing name and admin user, and create the local server state files.
 requires: []
 root: yes
+verify_root: no
 gates: none
 ---
 

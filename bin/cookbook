@@ -91,6 +91,26 @@ goal_recipes()  { _list_key "$(goal_meta "$1" recipes)"; }
 is_blocked()    { [ "$(meta "$1" status)" = "blocked" ]; }
 needs_root()    { [ "$(meta "$1" root)" = "yes" ]; }
 
+# `root:` describes apply — the script that changes the system. A verify usually needs far less:
+# have-server-identity's reads scutil names and group membership, and answers the same as any user.
+# Sudo'ing it anyway cost twice. Every root recipe reported `unknown` to a session with no terminal
+# even when its verify would have answered fine, and the preflight gate below then refused runs that
+# would never have called sudo at all — on a provisioned server, where every root recipe is already
+# satisfied and would be skipped, that is every run.
+#
+# `verify_root: no` says the verify does not need it. Absent, it inherits `root:`, so a recipe whose
+# verify genuinely cannot answer unprivileged — make-always-on and make-remote-accessible both read
+# through systemsetup, which refuses without root — keeps today's behaviour by saying nothing. Set
+# it only after running the verify as a plain user and confirming it reports the same facts, not
+# merely that it exits 0: a verify that silently reads less without root is one that lies.
+verify_needs_root() {
+  case "$(meta "$1" verify_root)" in
+    no)  return 1 ;;
+    yes) return 0 ;;
+    *)   needs_root "$1" ;;
+  esac
+}
+
 # A goal is a name a human would pick; a recipe is a name the graph uses. Accept either
 # everywhere, so `apply run-agents` and `apply have-vm-claude-code` both work.
 expand_targets() {
@@ -147,14 +167,21 @@ run_script() {
   local recipe="$1" script="$2" v
   local path="$RECIPES_DIR/$recipe/$script"
   [ -x "$path" ] || return 4
+  # Which flag applies depends on the script: apply always obeys `root:`, verify may opt out.
+  local as_root=false
+  if [ "$script" = verify.sh ]; then
+    verify_needs_root "$recipe" && as_root=true
+  else
+    needs_root "$recipe" && as_root=true
+  fi
   # Without this, sudo's own exit 1 lands in verify_rc as "not satisfied" — the code meaning
   # the fact is false — so a check that never ran reads as a check that failed. Everything
   # gated behind root then reports todo to whoever cannot sudo, which is exactly the reader
   # least able to notice. 5 means "could not check", which is a different thing to report.
-  if needs_root "$recipe" && ! sudo_available; then
+  if $as_root && ! sudo_available; then
     return 5
   fi
-  if needs_root "$recipe" && ! is_root; then
+  if $as_root && ! is_root; then
     local -a env_args=()
     for v in $PASSTHROUGH; do [ -n "${!v:-}" ] && env_args+=("$v=${!v}"); done
     # bash 3.2 (what macOS ships) treats "${arr[@]}" on an empty array as unset under
@@ -530,7 +557,13 @@ cmd_apply() {
   # fix.
   local needs_sudo=false root_recipes=""
   for r in $order; do
-    if needs_root "$r"; then needs_sudo=true; root_recipes="$root_recipes $r"; fi
+    needs_root "$r" || continue
+    # An already-satisfied recipe is skipped below and never calls sudo, so demanding a password
+    # for it stops runs that would have succeeded. Asking is only possible for a recipe whose
+    # verify does not itself need root; where it does, verify_rc comes back 5 and the recipe
+    # counts as needing sudo, which is the safe way round — we do not know that it is satisfied.
+    verify_rc "$r"; [ "$VERIFY_RC" -eq 0 ] && continue
+    needs_sudo=true; root_recipes="$root_recipes $r"
   done
   # sudo_available and nothing else, so this gate and run_script cannot disagree about whether
   # this session can reach root. Adding a condition here instead was exactly that disagreement:

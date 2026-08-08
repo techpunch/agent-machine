@@ -4,6 +4,7 @@ summary: Log the admin user in automatically at boot, so the server recovers una
 requires: [have-server-identity]
 needs: [filevault-off, admin-password]
 root: yes
+verify_root: no
 gates: the admin user's password, or the System Settings toggle
 ---
 

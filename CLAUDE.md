@@ -128,10 +128,22 @@ result). There is no central inventory here; a server carries its own record.
 
 ## The recipe contract
 
-- `recipe.md` — frontmatter (`name`, `summary`, `requires`, `root`, `status`) and the prose explaining
-  what it does, why, and what a human has to do by hand.
+- `recipe.md` — frontmatter (`name`, `summary`, `requires`, `root`, `verify_root`, `status`) and the
+  prose explaining what it does, why, and what a human has to do by hand.
 - `verify.sh` — is this already true? Read-only, cheap, safe to run any time.
 - `apply.sh` — make it true. Idempotent.
+
+`root:` describes `apply.sh`. Most verifies need far less, so a `root: yes` recipe whose verify
+answers fine as a plain user says `verify_root: no`; absent, it inherits `root:`. This is not a
+micro-optimisation — sudo'ing a verify that did not need it made every root recipe report `unknown`
+to a session with no terminal, and made `apply` refuse runs where the root recipes were all already
+satisfied and would have been skipped. On a provisioned server that is every run.
+
+Set it only after running the verify as a plain user and reading the output: it must report the same
+facts, not merely exit 0. A verify that silently checks less without root is a verify that lies, and
+that is worse than the sudo it saves. Where it genuinely cannot answer — `make-always-on` and
+`make-remote-accessible` both read through `systemsetup`, which refuses without root — say nothing
+and let it inherit.
 
 Exit codes are the interface between a recipe and the driver, and nothing else is:
 

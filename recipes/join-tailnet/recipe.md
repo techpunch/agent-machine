@@ -4,6 +4,7 @@ summary: Join the tailnet as this server, using a tagged pre-auth key.
 requires: [have-tailscale, have-server-identity]
 needs: [tailnet-key, tailnet-acl]
 root: yes
+verify_root: no
 gates: the auth key, supplied in the environment
 ---
 

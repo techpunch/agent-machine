@@ -4,6 +4,7 @@ summary: Advertise this server as a Tailscale exit node.
 requires: [join-tailnet]
 needs: [exit-node-approval]
 root: yes
+verify_root: no
 gates: route approval in the Tailscale admin console
 ---
 

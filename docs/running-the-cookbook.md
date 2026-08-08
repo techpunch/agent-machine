@@ -41,6 +41,10 @@ and neither does its `!` prefix, so an agent driving this hands the apply to a h
 output. Everything else here is read-only and runs anywhere. `apply` checks for a usable terminal
 before it starts, rather than failing at the first root recipe with sudo's own error.
 
+It only asks when a root recipe is actually going to run. One that is already satisfied gets skipped
+and never calls sudo, so it does not count — which is why re-running a finished goal, or applying a
+non-root recipe that merely depends on a root one, works from a session with no terminal at all.
+
 ## Letting an agent run the applies
 
 Optional. sudo needs `/dev/tty` only in order to ask for a password, so anything that answers the

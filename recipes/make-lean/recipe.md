@@ -3,6 +3,7 @@ name: make-lean
 summary: Stop the background work a server with nobody at the screen has no use for.
 requires: [have-server-identity]
 root: yes
+verify_root: no
 gates: none
 ---
 
