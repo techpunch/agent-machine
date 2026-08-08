@@ -86,8 +86,9 @@ That file is the single source for it; do not restate it elsewhere.
 - `bin/check` — everything checkable without a Mac: syntax, shellcheck, recipe and goal metadata,
   link integrity, and a dry run of the driver against a throwaway state dir. Run it before pushing.
 - `recipes/<name>/` — one recipe: `recipe.md` (contract), `verify.sh`, `apply.sh`.
-- `goals/<name>.md` — one selectable outcome in human words, naming the recipes that deliver it.
-  This is what `/setup` offers; recipe names never reach the user.
+- `goals/<name>.md` — one selectable outcome in human words, naming the recipes that deliver it,
+  and an `order:` fixing where it sits in the sequence a human should take them. This is what
+  `/setup` offers, in that order; recipe names never reach the user.
 - `prereqs/<name>.md` — one thing a human must arrange elsewhere, with how to do it and whether it
   has to happen before the run starts. Recipes point at these with `needs:`.
 - `lib/common.sh` — shared helpers, sourced by every script. Output helpers, the server-state accessors,

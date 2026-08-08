@@ -1,6 +1,7 @@
 ---
 name: remote-access
 summary: Reach it from anywhere
+order: 1
 recipes: [make-remote-accessible, join-tailnet]
 ---
 

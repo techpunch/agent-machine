@@ -66,6 +66,7 @@ done
 [ $fails -eq 0 ] && pass "all recipes well-formed"
 
 head "goals and prereqs"
+goal_orders=""
 for g in goals/*.md; do
   n=$(basename "$g" .md)
   rs=$(/usr/bin/awk 'NR==1&&$0=="---"{i=1;next} i&&$0=="---"{exit} i&&index($0,"recipes:")==1{sub("^recipes: *","");print;exit}' "$g" | /usr/bin/tr -d '[]' | /usr/bin/tr ',' ' ')
@@ -73,6 +74,16 @@ for g in goals/*.md; do
   for r in $rs; do
     [ -f "recipes/$r/recipe.md" ] || fail "goal $n names recipe '$r', which does not exist"
   done
+  # The listing order is what /setup offers, so a missing or duplicated order silently
+  # reshuffles what a fresh box is told to pick — invisible until somebody follows it.
+  o=$(/usr/bin/awk 'NR==1&&$0=="---"{i=1;next} i&&$0=="---"{exit} i&&index($0,"order:")==1{sub("^order: *","");print;exit}' "$g")
+  case "$o" in
+    ''|*[!0-9]*) fail "goal $n has order='$o' (must be a number; it sets the order /setup offers goals in)" ;;
+    *) case " $goal_orders " in
+         *" $o "*) fail "goal $n reuses order $o, so the listing order is not determined" ;;
+         *) goal_orders="$goal_orders $o" ;;
+       esac ;;
+  esac
 done
 for p in prereqs/*.md; do
   n=$(basename "$p" .md)

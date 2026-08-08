@@ -38,7 +38,21 @@ PASSTHROUGH="AGENT_MACHINE_STATE_DIR TS_AUTHKEY ADMIN_PASSWORD DOCKER_USER SERVE
 all_recipes() { /usr/bin/find "$RECIPES_DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort; }
 exists()      { [ -f "$RECIPES_DIR/$1/recipe.md" ]; }
 
-all_goals()   { [ -d "$GOALS_DIR" ] && /usr/bin/find "$GOALS_DIR" -maxdepth 1 -name '*.md' -exec basename {} .md \; | sort; }
+# Goals list in the order a human should take them, not alphabetically. /setup offers the
+# first four as the answer for somebody who does not want to think about it, so an
+# alphabetical listing hands them an exit node and no way to reach the machine. `order:` in
+# the goal frontmatter carries that sequence; a goal without one sorts last, by name.
+# (meta_file is defined below; shell resolves it at call time.)
+all_goals() {
+  [ -d "$GOALS_DIR" ] || return 0
+  local f n o
+  for f in "$GOALS_DIR"/*.md; do
+    [ -f "$f" ] || continue
+    n=$(basename "$f" .md)
+    o=$(meta_file "$f" order)
+    printf '%s\t%s\n' "${o:-9999}" "$n"
+  done | /usr/bin/sort -k1,1n -k2,2 | /usr/bin/cut -f2
+}
 goal_exists() { [ -f "$GOALS_DIR/$1.md" ]; }
 
 # Read one frontmatter key from any of the three file kinds — they share a format so this

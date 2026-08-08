@@ -1,6 +1,7 @@
 ---
 name: run-agents
 summary: Run coding agents on it
+order: 4
 recipes: [have-agent-sandbox]
 ---
 

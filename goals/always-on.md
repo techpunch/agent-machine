@@ -1,6 +1,7 @@
 ---
 name: always-on
 summary: Keep running unattended
+order: 2
 recipes: [make-always-on, make-auto-login]
 ---
 

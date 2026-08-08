@@ -1,6 +1,7 @@
 ---
 name: exit-node
 summary: Route your traffic through it
+order: 6
 recipes: [make-exit-node]
 ---
 
