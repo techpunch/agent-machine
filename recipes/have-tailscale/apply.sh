@@ -28,9 +28,30 @@ if [ -d /Applications/Tailscale.app ]; then
   # but it still raises the app's window, so an unguarded check puts Tailscale on the screen
   # once a minute forever. Guarded, a healthy tick runs pgrep and stops. The interval is also
   # the worst-case outage after a crash, which is why it is this short.
+  #
+  # The guard lives in a named script rather than inline after `sh -c`, because macOS labels a
+  # background item by the program it runs. Inline, System Settings lists it as "sh — Item from
+  # unidentified developer", which is exactly what a careful person switches off — taking the
+  # crash recovery with it, discovered after the next reboot with no monitor attached. Named,
+  # the entry says what it is and there is a file to go and read.
   agents="$HOME/Library/LaunchAgents"
   plist="$agents/$TS_AGENT_LABEL.plist"
-  mkdir -p "$agents"
+  watchdog="$STATE_DIR/tailscale-watchdog.sh"
+  mkdir -p "$agents" "$STATE_DIR"
+
+  cat >"$watchdog" <<'WATCHDOG'
+#!/bin/sh
+# Started every minute by com.agent-machine.tailscale-relaunch, and by the cookbook recipe
+# have-tailscale. On macOS the Tailscale app owns the network extension carrying the tunnel,
+# so if the app dies the server leaves the tailnet — headless, that is a lockout until
+# somebody logs in at the keyboard. Does nothing at all while the app is alive.
+/usr/bin/pgrep -qf Tailscale.app && exit 0
+/usr/bin/open -ga /Applications/Tailscale.app
+WATCHDOG
+  chmod 755 "$watchdog"
+  _own_state_dir
+  ok "wrote watchdog $watchdog"
+
   cat >"$plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -39,9 +60,7 @@ if [ -d /Applications/Tailscale.app ]; then
   <key>Label</key><string>$TS_AGENT_LABEL</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/sh</string>
-    <string>-c</string>
-    <string>/usr/bin/pgrep -qf Tailscale.app || /usr/bin/open -ga /Applications/Tailscale.app</string>
+    <string>$watchdog</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>StartInterval</key><integer>60</integer>

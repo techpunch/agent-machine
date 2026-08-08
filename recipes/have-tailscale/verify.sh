@@ -13,6 +13,7 @@ if [ -d /Applications/Tailscale.app ]; then
   # A LaunchAgent, not a login item. Login items can only be read through System Events,
   # which triggers a TCC prompt that blocks forever on a server with nobody at the screen.
   plist="$(_admin_home)/Library/LaunchAgents/$TS_AGENT_LABEL.plist"
+  watchdog="$STATE_DIR/tailscale-watchdog.sh"
   if [ ! -f "$plist" ]; then
     miss "no relaunch agent at $plist — Tailscale won't come back after a reboot"
   # Checking the contents, not just that the file exists: a server set up before the periodic
@@ -24,10 +25,14 @@ if [ -d /Applications/Tailscale.app ]; then
   # An unguarded periodic open raises the Tailscale window every tick. That is not a
   # cosmetic complaint on a machine somebody also uses at the screen, and it is the kind of
   # thing people fix by deleting the agent, which costs them the crash recovery too.
-  elif ! /usr/bin/grep -q pgrep "$plist"; then
+  elif ! /usr/bin/grep -q tailscale-watchdog.sh "$plist"; then
     miss "relaunch agent at $plist opens Tailscale every tick instead of only when it has died"
+  # An agent pointing at a script that is missing or not executable fails silently every
+  # minute: launchd records the error and nothing else says a word.
+  elif [ ! -x "$watchdog" ]; then
+    miss "watchdog $watchdog is missing or not executable — the agent runs nothing"
   else
-    ok "relaunch agent at $plist, with a guarded periodic check"
+    ok "relaunch agent at $plist, running $watchdog"
   fi
 
   /usr/bin/pgrep -qf 'Tailscale.app' && ok "Tailscale.app is running" \
