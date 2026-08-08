@@ -19,6 +19,15 @@ ok "tailscale CLI at $cli"
 if [ -d /Applications/Tailscale.app ]; then
   # A LaunchAgent rather than a login item: it is a file we can write and read back,
   # where login items can only be touched through System Events and its TCC prompt.
+  #
+  # RunAtLoad covers a reboot; StartInterval covers the rest. On macOS the app owns the
+  # network extension that carries the tunnel, so if Tailscale quits or crashes the server
+  # leaves the tailnet — and on a headless box that is a lockout until somebody logs in
+  # physically. The tick is guarded by pgrep rather than calling `open` unconditionally:
+  # `open -ga` leaves a running app's process and tunnel alone — same pid, same extension —
+  # but it still raises the app's window, so an unguarded check puts Tailscale on the screen
+  # once a minute forever. Guarded, a healthy tick runs pgrep and stops. The interval is also
+  # the worst-case outage after a crash, which is why it is this short.
   agents="$HOME/Library/LaunchAgents"
   plist="$agents/$TS_AGENT_LABEL.plist"
   mkdir -p "$agents"
@@ -30,11 +39,12 @@ if [ -d /Applications/Tailscale.app ]; then
   <key>Label</key><string>$TS_AGENT_LABEL</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/open</string>
-    <string>-ga</string>
-    <string>/Applications/Tailscale.app</string>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>/usr/bin/pgrep -qf Tailscale.app || /usr/bin/open -ga /Applications/Tailscale.app</string>
   </array>
   <key>RunAtLoad</key><true/>
+  <key>StartInterval</key><integer>60</integer>
 </dict>
 </plist>
 PLIST

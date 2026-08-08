@@ -13,8 +13,22 @@ if [ -d /Applications/Tailscale.app ]; then
   # A LaunchAgent, not a login item. Login items can only be read through System Events,
   # which triggers a TCC prompt that blocks forever on a server with nobody at the screen.
   plist="$(_admin_home)/Library/LaunchAgents/$TS_AGENT_LABEL.plist"
-  [ -f "$plist" ] && ok "relaunch agent at $plist" \
-    || miss "no relaunch agent at $plist — Tailscale won't come back after a reboot"
+  if [ ! -f "$plist" ]; then
+    miss "no relaunch agent at $plist — Tailscale won't come back after a reboot"
+  # Checking the contents, not just that the file exists: a server set up before the periodic
+  # check was added has a plist that passes a bare -f test while recovering from nothing but a
+  # reboot. A verify that cannot see the difference leaves those servers on the old agent for
+  # good, because apply never runs again.
+  elif ! /usr/bin/plutil -extract StartInterval raw -o - "$plist" >/dev/null 2>&1; then
+    miss "relaunch agent at $plist has no StartInterval — it recovers a reboot but not a crash"
+  # An unguarded periodic open raises the Tailscale window every tick. That is not a
+  # cosmetic complaint on a machine somebody also uses at the screen, and it is the kind of
+  # thing people fix by deleting the agent, which costs them the crash recovery too.
+  elif ! /usr/bin/grep -q pgrep "$plist"; then
+    miss "relaunch agent at $plist opens Tailscale every tick instead of only when it has died"
+  else
+    ok "relaunch agent at $plist, with a guarded periodic check"
+  fi
 
   /usr/bin/pgrep -qf 'Tailscale.app' && ok "Tailscale.app is running" \
     || miss "Tailscale.app is not running"
