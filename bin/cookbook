@@ -129,11 +129,16 @@ plan_for() { local r; _resolved=""; _visiting=""; for r in "$@"; do resolve "$r"
 
 # ---- running ----------------------------------------------------------------
 
-# Can this session get root at all — already root, a live sudo timestamp, or a terminal sudo
-# could prompt on? `sudo -n` never prompts, so this is safe to call on a headless server.
+# Can this session get root at all — already root, a live sudo timestamp, an askpass helper, or a
+# terminal sudo could prompt on? `sudo -n` never prompts, so this is safe to call on a headless
+# server. Every caller goes through here: the answer has to be one answer, or the driver refuses a
+# run in one place and reports "could not check" in another for the same session.
 sudo_available() {
   is_root && return 0
   /usr/bin/sudo -n true 2>/dev/null && return 0
+  # sudo reaches for the askpass helper on its own when there is no terminal — no -A needed
+  # (man sudo, SUDO_ASKPASS). Someone who set it has answered the password question already.
+  [ -n "${SUDO_ASKPASS:-}" ] && return 0
   (: </dev/tty) 2>/dev/null
 }
 
@@ -522,14 +527,16 @@ cmd_apply() {
   # a pipe, so a root recipe fails on "a terminal is required to read the password" partway into
   # the plan — after the run has started, with sudo's error and no hint of what to do. Driving a
   # server from Claude Code is the normal case here, so check before anything runs and say the
-  # fix. SUDO_ASKPASS means something else can answer, so leave that alone.
+  # fix.
   local needs_sudo=false root_recipes=""
   for r in $order; do
     if needs_root "$r"; then needs_sudo=true; root_recipes="$root_recipes $r"; fi
   done
-  # Same check the verifies use, so the two cannot drift into disagreeing about whether this
-  # session can reach root. SUDO_ASKPASS means something else can answer the prompt.
-  if $needs_sudo && [ -z "${SUDO_ASKPASS:-}" ] && ! sudo_available; then
+  # sudo_available and nothing else, so this gate and run_script cannot disagree about whether
+  # this session can reach root. Adding a condition here instead was exactly that disagreement:
+  # SUDO_ASKPASS got the run past this point, then run_script refused every root recipe with 5,
+  # and the run died on "apply failed (exit 5)" with the escape hatch apparently supported.
+  if $needs_sudo && ! sudo_available; then
     printf 'error: this plan needs sudo, and there is no terminal here to type a password into.\n' >&2
     printf '  needs root:%s\n' "$root_recipes" >&2
     printf '  Run it in a terminal window on the server — Terminal.app, or an ssh session:\n' >&2
