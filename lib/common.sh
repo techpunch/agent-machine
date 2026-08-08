@@ -111,6 +111,9 @@ _log_rotate() {
 # Appending instead would turn the ledger into a second, worse copy of run.log, and the
 # whole reason both files exist is that they answer different questions — this one answers
 # "what is this machine", the log answers "what happened to it".
+# True when the ledger already carries a row for this recipe.
+ledger_has() { [ -f "$SERVER_LEDGER" ] && /usr/bin/grep -q "^| ${1} |" "$SERVER_LEDGER"; }
+
 record_applied() {
   local recipe="$1" detail="${2:-}" tmp
   mkdir -p "$STATE_DIR"

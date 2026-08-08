@@ -426,6 +426,12 @@ cmd_apply() {
     verify_rc "$r"; rc=$VERIFY_RC
     if [ "$rc" -eq 0 ]; then
       printf '   already satisfied\n'
+      # The ledger is what is true now, not a list of what this driver happened to run. A
+      # recipe already satisfied — installed before the cookbook saw it, or applied on an
+      # earlier run that a later recipe then failed after — belongs in it just as much, or
+      # the record under-reports the server. Only when absent, so the timestamp keeps
+      # meaning "true since" rather than "last time anyone typed apply".
+      ledger_has "$r" || record_applied "$r" "$(meta "$r" summary)"
       log_event skipped "$r" "already satisfied"
       continue
     fi
