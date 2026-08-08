@@ -58,6 +58,14 @@ How to work when you hit one:
   server does that, so say which is which.
 - Say what you changed and why, plainly, including what you could not verify because you were not on
   a real server.
+- A question the user has to ask is a defect. If they ask something the run should have told them —
+  which editor, which toggle, what happens next, what a prompt means — the gap is in the recipe,
+  prereq or gate text that stayed silent, not in their attention. Answer them, then fix the file
+  that should have said it.
+- Fix it during the run, commit it, and say so. Do not collect repairs to land at the end: a setup
+  run is the only place these defects surface, and an uncommitted fix dies with the session. Commit
+  each fix on its own as you go, and tell the user what changed and that it is committed, so the
+  next server gets it whether or not this run finishes.
 
 The one thing that is not self-correction: editing a recipe to make a verify pass without
 understanding why it failed. That is papering over, it runs as root on every server that pulls this
