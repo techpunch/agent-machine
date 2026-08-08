@@ -38,7 +38,8 @@ To mint one, in the Tailscale admin console signed in as the tailnet owner:
      The tag has to exist before a key can carry it. Full context: docs/shared-setup.md
   2. Settings > Keys > Generate auth key.
   3. On that form, top to bottom:
-       Description  what it provisions and when, e.g. 'agent-machine servers (tag:host)'
+       Description  what it provisions and when, letters digits and spaces only — the console
+                    rejects punctuation. e.g. 'agent machine servers tagged host minted 20260314'
        Reusable     ON   — the same key provisions the next server too
        Expiration   90 days, the maximum offered. This expires the key, not the nodes it
                     authenticated: a tagged node's own key never expires, so servers already

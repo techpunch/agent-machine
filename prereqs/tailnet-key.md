@@ -11,8 +11,12 @@ About five minutes in a browser, on your laptop rather than the server.
        "tagOwners": { "tag:host": ["your-login@example.com"] }
 3. Open Settings, then Keys, and generate an auth key. The form, top to bottom:
        Description   what it provisions and when you minted it, e.g.
-                     "agent-machine servers (tag:host) — minted 2026-03-14". You are writing
-                     this for whoever later has to decide if revoking it is safe.
+                     "agent machine servers tagged host minted 20260314". You are writing this
+                     for whoever later has to decide if revoking it is safe. The console
+                     rejects punctuation here — observed on the Generate auth key form in
+                     August 2026; the field's character set is not documented on Tailscale's
+                     auth keys or API reference pages. Letters, digits and spaces are safe, so
+                     spell out the tag and run the date together rather than hyphenating.
        Reusable      ON   — the same key provisions the next server too
        Expiration    90 days, the maximum the form allows
        Ephemeral     OFF  — an ephemeral node is removed when it goes offline
