@@ -129,10 +129,25 @@ plan_for() { local r; _resolved=""; _visiting=""; for r in "$@"; do resolve "$r"
 # ---- running ----------------------------------------------------------------
 
 # Root recipes get sudo, carrying only the variables a recipe is allowed to read.
+# Can this session get root at all — already root, a live sudo timestamp, or a terminal sudo
+# could prompt on? `sudo -n` never prompts, so this is safe to call on a headless server.
+sudo_available() {
+  is_root && return 0
+  /usr/bin/sudo -n true 2>/dev/null && return 0
+  (: </dev/tty) 2>/dev/null
+}
+
 run_script() {
   local recipe="$1" script="$2" v
   local path="$RECIPES_DIR/$recipe/$script"
   [ -x "$path" ] || return 4
+  # Without this, sudo's own exit 1 lands in verify_rc as "not satisfied" — the code meaning
+  # the fact is false — so a check that never ran reads as a check that failed. Everything
+  # gated behind root then reports todo to whoever cannot sudo, which is exactly the reader
+  # least able to notice. 5 means "could not check", which is a different thing to report.
+  if needs_root "$recipe" && ! sudo_available; then
+    return 5
+  fi
   if needs_root "$recipe" && ! is_root; then
     local -a env_args=()
     for v in $PASSTHROUGH; do [ -n "${!v:-}" ] && env_args+=("$v=${!v}"); done
@@ -186,6 +201,7 @@ state_word() {
     1) printf 'todo' ;;
     2) printf 'blocked' ;;
     4) printf 'no-script' ;;
+    5) printf 'unknown' ;;
     *) printf "exit-$1" ;;
   esac
 }
@@ -211,6 +227,10 @@ cmd_status() {
     fi
     local out; out=$(run_script "$r" verify.sh 2>&1); rc=$?
     printf '\n%-24s %s\n' "$r" "$(state_word $rc)"
+    if [ $rc -eq 5 ]; then
+      printf '  needs root to check, and sudo is not available here\n'
+      continue
+    fi
     if [ $rc -ne 0 ]; then
       # Normally the MISSING/BLOCKED lines are the whole story. When there are none, the
       # verify failed for some other reason (sudo declined, a tool absent) — show it all
@@ -237,17 +257,26 @@ cmd_plan() {
 # The selectable outcomes, in words a human would use, each marked with whether it is
 # already true. This is what /setup offers; recipe names never reach the user.
 cmd_goals() {
-  local g r order state
+  local g r order state any_unknown=false
   printf '%-20s %-9s %s\n' GOAL STATE SUMMARY
   for g in $(all_goals); do
     state=done
     order=$(plan_for $(goal_recipes "$g")) || exit 1
     for r in $order; do
       if is_blocked "$r"; then state=blocked; break; fi
-      verify_rc "$r"; [ "$VERIFY_RC" -eq 0 ] || { state=available; break; }
+      verify_rc "$r"
+      case "$VERIFY_RC" in
+        0) ;;
+        # Saying "available" here would be a guess dressed as a fact, and the guess runs one
+        # way: a goal that is entirely done reads as work still to do.
+        5) state=unknown; any_unknown=true; break ;;
+        *) state=available; break ;;
+      esac
     done
     printf '%-20s %-9s %s\n' "$g" "$state" "$(goal_meta "$g" summary)"
   done
+  $any_unknown && printf '\nunknown: some checks need root and could not run here. Re-run from a\nterminal, or after `sudo -v`, for a real answer.\n' >&2
+  return 0
 }
 
 # What a human has to arrange elsewhere before this can run. Only prerequisites of recipes
@@ -404,11 +433,9 @@ cmd_apply() {
   for r in $order; do
     if needs_root "$r"; then needs_sudo=true; root_recipes="$root_recipes $r"; fi
   done
-  # Test what sudo actually needs — an openable /dev/tty — not whether stdin is a terminal.
-  # sudo prompts on /dev/tty regardless of its own stdin, so `[ -t 0 ]` rejects working setups.
-  if $needs_sudo && ! is_root && [ -z "${SUDO_ASKPASS:-}" ] \
-     && ! (: </dev/tty) 2>/dev/null \
-     && ! /usr/bin/sudo -n true 2>/dev/null; then
+  # Same check the verifies use, so the two cannot drift into disagreeing about whether this
+  # session can reach root. SUDO_ASKPASS means something else can answer the prompt.
+  if $needs_sudo && [ -z "${SUDO_ASKPASS:-}" ] && ! sudo_available; then
     printf 'error: this plan needs sudo, and there is no terminal here to type a password into.\n' >&2
     printf '  needs root:%s\n' "$root_recipes" >&2
     printf '  Run it in a terminal window on the server — Terminal.app, or an ssh session:\n' >&2
