@@ -64,9 +64,18 @@ gate() {
 # Anything written under sudo would otherwise land root-owned in the admin user's home.
 # Same reason as _admin_home for disbelieving SUDO_USER=root: after a recipe re-execs itself as
 # the admin user, handing the state dir "back" would hand it to root.
+#
+# ADMIN_USER is the fallback rather than a second-best guess: it is the one value that says who
+# this state belongs to regardless of how the process reached root. Without it, a root run that
+# arrived with SUDO_USER unset or equal to root left files behind that no later non-root recipe
+# could rewrite — which is how this server ended up with a root-owned server.md that made `mv`
+# stop and ask, on a machine whose entire purpose is having nobody there to answer.
 _own_state_dir() {
-  [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ] \
-    && /usr/sbin/chown -R "$SUDO_USER" "$STATE_DIR" 2>/dev/null || true
+  local owner="${SUDO_USER:-}"
+  [ "$owner" = root ] && owner=""
+  [ -n "$owner" ] || owner="${ADMIN_USER:-}"
+  [ -n "$owner" ] && [ "$owner" != root ] \
+    && /usr/sbin/chown -R "$owner" "$STATE_DIR" 2>/dev/null || true
 }
 
 need_var() {
@@ -109,7 +118,10 @@ _log_rotate() {
   local size
   size=$(/usr/bin/wc -c <"$RUN_LOG" 2>/dev/null || echo 0)
   [ "${size:-0}" -gt 5242880 ] || return 0
-  /bin/mv "$RUN_LOG" "$RUN_LOG.1" 2>/dev/null || return 0
+  # -f for the same reason as the ledger: the previous roll may have left a file this run
+  # cannot write, and mv would ask about it rather than fail. Redirecting stderr does not
+  # help — the question goes to the terminal, and on this machine there is not one.
+  /bin/mv -f "$RUN_LOG" "$RUN_LOG.1" 2>/dev/null || return 0
   printf '%s  %-12s %-24s %s\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "log-rolled" "-" "previous log kept at $(basename "$RUN_LOG").1" >>"$RUN_LOG"
 }
@@ -133,7 +145,10 @@ record_applied() {
   tmp="$SERVER_LEDGER.tmp.$$"
   # grep exits 1 when it drops every line, which under set -e would abort the recipe.
   /usr/bin/grep -v "^| ${recipe} |" "$SERVER_LEDGER" >"$tmp" || true
-  /bin/mv "$tmp" "$SERVER_LEDGER"
+  # -f, always: mv stops and asks before replacing a file the caller cannot write, and a
+  # question asked on a headless server is a hang, not a prompt. The replace is intended
+  # every time this line runs, so there is nothing for a human to decide.
+  /bin/mv -f "$tmp" "$SERVER_LEDGER"
 
   printf '| %s | %s | %s |\n' "$recipe" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$detail" >>"$SERVER_LEDGER"
   _own_state_dir

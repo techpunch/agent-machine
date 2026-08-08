@@ -42,7 +42,8 @@ note "adopted SERVER_NAME=$name SERVER_SLUG=$slug ADMIN_USER=$admin"
 if [ -f "$SERVER_LEDGER" ] && [ "$(/usr/bin/head -1 "$SERVER_LEDGER")" != "# $name" ]; then
   tmp="$SERVER_LEDGER.tmp.$$"
   { printf '# %s\n' "$name"; /usr/bin/tail -n +2 "$SERVER_LEDGER"; } >"$tmp" \
-    && /bin/mv "$tmp" "$SERVER_LEDGER"
+    && /bin/mv -f "$tmp" "$SERVER_LEDGER"
+  _own_state_dir
   note "retitled ledger to '$name'"
 fi
 
