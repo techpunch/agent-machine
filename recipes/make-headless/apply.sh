@@ -11,8 +11,9 @@ if [ -z "${REBOOT_TEST_ASKED_AT:-}" ] || [ "$boot_epoch" -lt "${REBOOT_TEST_ASKE
   gate "Reboot survival test. Nothing has been unplugged.
 Reboot the server now:
   sudo reboot
-Wait for it to come back, reconnect over Tailscale, and re-run this recipe. It will check that
-auto-login happened, Tailscale reconnected, and SSH still answers."
+Wait for it to come back, reconnect over Tailscale, and re-run:
+  ./bin/cookbook apply headless
+It will check that auto-login happened, Tailscale reconnected, and SSH still answers."
 fi
 
 console=$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)
@@ -38,8 +39,9 @@ if [ -z "${HEADLESS_CONFIRMED:-}" ]; then
   2. Plug the headless display dongle into the same HDMI port.
   3. Disconnect the USB keyboard and mouse.
   4. Reconnect over Screen Sharing and confirm a full-resolution desktop through the dongle.
+     From another Mac on the tailnet that is:  open vnc://${SERVER_SLUG:-<slug>}
 Then re-run with:
-  HEADLESS_CONFIRMED=1 ./recipes/make-headless/apply.sh"
+  HEADLESS_CONFIRMED=1 ./bin/cookbook apply headless"
 fi
 
 res=$(/usr/sbin/system_profiler SPDisplaysDataType 2>/dev/null | /usr/bin/awk -F': ' '/Resolution/ {print $2; exit}')
