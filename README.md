@@ -1,8 +1,8 @@
 # agent-machine
 
-Turn a spare Mac into an always-on server that runs coding agents, optionally running headless,
-reachable from any device on your tailnet, with each agent sandboxed in its own microVM so they can
-run in YOLO mode ("skip all permission prompts") safer.
+Interactively turns a spare Mac into an always-on server that run can run apps as well as
+sandboxed coding agents, reachable from any device on your tailnet, optionally running
+headless and/or as an exit node and other options. B
 
 WARNING: this project is suggested to be run with `claude --dangerously-skip-permissions`. It
 also suggests that you turn off FileVault encryption if you want your server to auto restart.
@@ -11,7 +11,19 @@ You shouldn't proceed unless you understand the associated risks of these sugges
 Agent isolation uses [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/), which is
 proprietary and needs a free Docker account. The host layer does not depend on it.
 
-## Get it running
+
+## Project status - Several useful working pieces!
+
+I used this project in August 2026 to successfully do configure my Mac Mini M4:
+
+- Reachable from anywhere on my tailnet over SSH and screen sharing.
+- Running 24/7 with autologin on power failure or reboot, including a tailscale watchdog to
+  make sure tailscale is restarted if it crashes.
+- Acting as a tailscale exit node so I can selectively route traffic through my home internet
+  connection when I'm at a cafe on untrusted wifi with my phone or laptop.
+
+
+## Quick Start
 
 On your spare Mac with a monitor and keyboard (have a cheap HDMI dummy dongle on hand or on order
 too if you plan to run 24/7 headless):
@@ -71,6 +83,23 @@ finished step is a no-op.
 | Run coding agents on it | WIP - A microVM per agent, egress under policy, nothing shared with the Mac |
 | Drive many projects at once | WIP - A persistent terminal grid you attach to from anywhere |
 | Stop running what nobody uses | Spotlight, screen saver and desktop widgets off, so agents get the CPU |
+
+## Ask it things later
+
+This repo is also useful for asking claude questions about the machine you built with it. Six
+months from now you will not remember how the tailnet is configured, which password-manager
+entry holds the tailnet key, or what you turned off and why. Open claude in this directory on
+the server and ask in plain words:
+
+- what did we turn off on this machine, and why?
+- can this machine access my laptop or is it only one way?
+- has this thing actually survived a power cut, or did we only configure it to?
+- how do I revoke access if the Mac gets stolen?
+- how do I remote screen into this computer?
+
+The answers come from this server — its recipes, its own record, and a log of every action ever
+taken on it — so they are about this machine rather than a machine in general. `/cookbook` gives
+the same picture as a report: what is true right now, item by item, and what is still missing.
 
 ## Keep a copy of the details off the server
 
