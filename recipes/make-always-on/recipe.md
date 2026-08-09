@@ -21,6 +21,10 @@ have and stays green; it only goes red for a key that exists and is set wrong. A
 exposes `womp` and `autorestart` and accepts `systemsetup -setrestartpowerfailure`, so nothing is
 skipped there; the skip path exists for models that differ, and portables in particular.
 
+Both halves have been confirmed on an M4 mini rather than inferred: a remote reboot came back
+unattended, and pulling the power brought it up again with nobody pressing the button. So on this
+hardware the settings do what they claim, which is not something a `pmset -g` readout can tell you.
+
 ## Proving it
 
 Verify reads the settings back. That is not the same as watching the machine come up, and the two
