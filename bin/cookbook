@@ -515,6 +515,15 @@ cmd_record() {
     printf '## Reaching it, from a client\n\n'
     printf '```\nssh %s\n```\n\n' "${SERVER_SLUG:-<slug>}"
 
+    # Screen Sharing is the escape hatch for everything SSH cannot do — an App Store sign-in,
+    # an OAuth window, an installer dialog — and it is the thing people forget they have until
+    # they need it, which is the worst moment to work out the URL scheme.
+    printf 'For the GUI, when a step needs a screen — a sign-in window, an installer dialog:\n\n'
+    printf '```\nopen vnc://%s\n```\n\n' "${SERVER_SLUG:-<slug>}"
+    printf 'Or Finder > Go > Connect to Server (Cmd-K) and the same `vnc://` address. Log in as\n'
+    printf '`%s` with that account'"'"'s password. Worth trying once now rather than first\n' "${ADMIN_USER:-<admin>}"
+    printf 'discovering it works the day something needs a dialog clicked.\n\n'
+
     printf '## Fetching this, from a client\n\n'
     printf 'Run this on the laptop, not on the server and not after ssh-ing in — scp is the\n'
     printf 'client pulling the file across, so both paths below are read from the client end.\n'

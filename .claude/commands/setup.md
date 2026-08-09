@@ -130,6 +130,21 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
 
      Tell them to re-run `./bin/cookbook record` after any later run, since it is a snapshot.
 
+   - How to use and test each thing they just turned on, in that goal's own terms. A recipe
+     that verifies clean has proved the setting, not the experience, and some of these are
+     never exercised by the rest of the run — so they sit untested until the day they are
+     needed, which is the worst moment to find out. Each recipe.md has a section for this;
+     give the commands rather than the reasoning. The two that catch people:
+
+     Screen Sharing, after remote access. Nothing later in the cookbook needs a GUI, so it
+     goes unused until something does. `open vnc://<slug>` from a Mac on the tailnet, logging
+     in as the admin user with that account's password.
+
+     The exit node, after exit-node. It is chosen per client and does nothing until someone
+     picks it: Tailscale menu bar or iPhone app > Exit Node > this server. The proof is
+     `curl -s ifconfig.me` before and after. https://tailscale.com/kb/1103/exit-nodes covers
+     every platform in one short page.
+
    - How to prove unattended recovery, if they applied always-on but not headless. A verify
      that reads pmset settings back is not a machine you have watched come up, and they will
      want to know the difference before the server is somewhere inconvenient. Give them the
