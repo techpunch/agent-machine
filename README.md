@@ -1,8 +1,8 @@
 # agent-machine
 
 Interactively turns a spare Mac into an always-on server that run can run apps as well as
-sandboxed coding agents, reachable from any device on your tailnet, optionally running
-headless and/or as an exit node and other options. B
+OpenClaw, Hermes, sandboxed coding agents, reachable from any device on your tailnet,
+optionally running headless and/or as an exit node and other options.
 
 WARNING: this project is suggested to be run with `claude --dangerously-skip-permissions`. It
 also suggests that you turn off FileVault encryption if you want your server to auto restart.
