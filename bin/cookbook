@@ -13,6 +13,7 @@
 #   cookbook denials [sandbox]     what the egress policy blocked, and how to allow it
 #   cookbook log [n]               the last n lines of the run log
 #   cookbook record                write the keep-a-copy-elsewhere record for this server
+#   cookbook sudo-window on|off    one password, so an agent can run the applies for 30 minutes
 #
 # Goals and recipes are interchangeable as arguments; goals are the human-facing names.
 # Exit codes mirror the recipes: 0 done, 1 failed, 2 blocked, 3 stopped at a manual gate.
@@ -41,6 +42,43 @@ warn_temp_sudo() {
   printf '      Remove it when you are done:  sudo rm %s\n' "$TEMP_SUDO_FILE" >&2
 }
 trap warn_temp_sudo EXIT
+
+# The drop-in used to be four lines of printf/visudo/install for a human to paste, which is
+# both easy to fumble and easy to never be told about. Same commands, one word, so the guard
+# that needs to recommend it can name something short enough to say in passing.
+cmd_sudo_window() {
+  case "${1:-}" in
+    on)
+      local tmp
+      tmp=$(/usr/bin/mktemp) || { echo "error: could not create a temp file" >&2; exit 1; }
+      printf 'Defaults timestamp_type=global\nDefaults timestamp_timeout=30\n' >"$tmp"
+      # Validate before installing, always. A malformed sudoers file locks this account out of
+      # sudo entirely, and on a headless server that means a keyboard you no longer have.
+      if ! /usr/bin/sudo /usr/sbin/visudo -cf "$tmp" >/dev/null; then
+        /bin/rm -f "$tmp"
+        echo "error: the drop-in did not validate; nothing was installed" >&2
+        exit 1
+      fi
+      /usr/bin/sudo /usr/bin/install -m 440 -o root -g wheel "$tmp" "$TEMP_SUDO_FILE" || {
+        /bin/rm -f "$tmp"; echo "error: could not install $TEMP_SUDO_FILE" >&2; exit 1; }
+      /bin/rm -f "$tmp"
+      /usr/bin/sudo -v || { echo "error: sudo did not accept the password" >&2; exit 1; }
+      printf 'sudo window open for 30 minutes — an agent session can now run the applies.\n'
+      printf 'Close it when the run is done:  ./bin/cookbook sudo-window off\n'
+      ;;
+    off)
+      /usr/bin/sudo /bin/rm -f "$TEMP_SUDO_FILE" || exit 1
+      /usr/bin/sudo -k
+      printf 'sudo window closed; %s removed.\n' "$TEMP_SUDO_FILE"
+      ;;
+    *)
+      echo "usage: cookbook sudo-window on|off" >&2
+      echo "  on   one password, counted in every session of this user for 30 minutes" >&2
+      echo "  off  remove the drop-in and forget the cached credential" >&2
+      exit 1
+      ;;
+  esac
+}
 
 # Secrets reach a root recipe as `sudo VAR=value ...`, so they never land in server.env.
 # This is the escape hatch, not the default — it is visible in ps for the life of the
@@ -639,6 +677,10 @@ cmd_apply() {
     printf '      ./bin/cookbook apply %s\n' "$target" >&2
     printf "  Claude Code's own shell is not one, with or without a leading !, so a run driven\\n" >&2
     printf '  from inside Claude Code stops here rather than failing at the first root recipe.\n' >&2
+    printf '\n  Or, to let this session run the applies itself, in a terminal once:\n' >&2
+    printf '      ./bin/cookbook sudo-window on\n' >&2
+    printf '  One password, counted in every session of this user for 30 minutes. Costs and\n' >&2
+    printf '  alternatives: docs/running-the-cookbook.md.\n' >&2
     exit 1
   fi
 
@@ -704,5 +746,6 @@ case "${1:-}" in
   denials)   shift; cmd_denials "${1:-}" ;;
   log)       shift; cmd_log "${1:-40}" ;;
   record)    cmd_record ;;
-  *)         /usr/bin/sed -n '2,16p' "${BASH_SOURCE[0]}" | /usr/bin/sed 's/^# \{0,1\}//' ;;
+  sudo-window) shift; cmd_sudo_window "${1:-}" ;;
+  *)         /usr/bin/sed -n '2,17p' "${BASH_SOURCE[0]}" | /usr/bin/sed 's/^# \{0,1\}//' ;;
 esac

@@ -56,23 +56,26 @@ By default sudo keeps a separate credential record per terminal, which is why au
 Terminal.app does nothing for an agent's session. `timestamp_type=global` makes one record cover
 all of a user's login sessions. The human still types the password; it just counts everywhere.
 
-Install it in a terminal, then authenticate:
+Install it in a terminal, which also authenticates you:
 
 ```
-printf 'Defaults timestamp_type=global\nDefaults timestamp_timeout=30\n' > /tmp/am-sudo-timestamp
-sudo visudo -cf /tmp/am-sudo-timestamp && sudo install -m 440 -o root -g wheel /tmp/am-sudo-timestamp /etc/sudoers.d/agent-machine-setup
-sudo -v
+./bin/cookbook sudo-window on
 ```
 
-Validate before installing, as above. A malformed sudoers file can lock you out of sudo entirely,
-and a separate file under `sudoers.d` keeps the damage to something you can delete. The timeout is
+It writes the drop-in, validates it, installs it as `/etc/sudoers.d/agent-machine-setup`, and runs
+`sudo -v`. Validation happens before installation and the run stops if it fails: a malformed sudoers
+file can lock you out of sudo entirely, which on a headless server means a keyboard you no longer
+have. A separate file under `sudoers.d` keeps the damage to something you can delete. The timeout is
 minutes, 5 by default; 30 covers a working session without leaving the window open all day.
 
-Remove it when the run is done, and confirm with `ls /etc/sudoers.d/`:
+Close it when the run is done, and confirm with `ls /etc/sudoers.d/`:
 
 ```
-sudo rm /etc/sudoers.d/agent-machine-setup
+./bin/cookbook sudo-window off
 ```
+
+That removes the file and runs `sudo -k`, so the cached credential goes with it rather than staying
+valid for the rest of the window.
 
 What this costs: for the length of the window, any process running as that user can sudo without
 a password, not just the cookbook. What it does not cost is a standing grant — the file alone

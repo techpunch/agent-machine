@@ -59,6 +59,14 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
 
        ./bin/cookbook apply <goals>
 
+   If that hand-off is going to happen more than once, offer the alternative rather than
+   making them paste output all afternoon: `./bin/cookbook sudo-window on`, run once in a
+   terminal, is one password that counts in your session too for 30 minutes, after which you
+   can drive the applies yourself. Say what it costs in a sentence — any process running as
+   that user can sudo without a password for the window — and close it with
+   `./bin/cookbook sudo-window off` when the run is done. Offer it; do not install it for
+   them and do not press it if they would rather keep root in their own hands.
+
 6. Handle what comes back:
 
    - Exit 3, a gate. Not a failure — a step the machine cannot take. Check it is still true
