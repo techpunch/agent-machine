@@ -8,13 +8,10 @@ WARNING: this project is suggested to be run with `claude --dangerously-skip-per
 also suggests that you turn off FileVault encryption if you want your server to auto restart.
 You shouldn't proceed unless you understand the associated risks of these suggestions.
 
-Agent isolation uses [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/), which is
-proprietary and needs a free Docker account. The host layer does not depend on it.
-
 
 ## Project status - Several useful working pieces!
 
-I used this project in August 2026 to successfully do configure my Mac Mini M4:
+I used this project in August 2026 to successfully configure my Mac Mini M4:
 
 - Reachable from anywhere on my tailnet over SSH and screen sharing.
 - Running 24/7 with autologin on power failure or reboot, including a tailscale watchdog to
@@ -126,6 +123,9 @@ In case you're curious to know more about how it works and the internals:
 - [`docs/host-agent-design.md`](docs/host-agent-design.md) — why the host and the agents are separate.
 - [`docs/shared-setup.md`](docs/shared-setup.md) — accounts and tailnet, once before the first server.
 - [`CLAUDE.md`](CLAUDE.md) — repo layout and how to write a recipe.
+
+Agent isolation uses [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/), which is
+proprietary and needs a free Docker account. The host layer does not depend on it.
 
 Not built yet, each carrying a contract in its recipe directory explaining what it is waiting on:
 encryption at rest that survives an unattended reboot (`recipes/make-data-encrypted/`), and stopping
