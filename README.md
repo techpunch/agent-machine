@@ -11,7 +11,7 @@ You shouldn't proceed unless you understand the associated risks of these sugges
 
 ## Project status - Several useful working pieces!
 
-I used this project in August 2026 to successfully configure my Mac Mini M4:
+August 2026 - Successfully used this project to successfully configure a Mac Mini M4:
 
 - Reachable from anywhere on my tailnet over SSH and screen sharing.
 - Running 24/7 with autologin on power failure or reboot, including a tailscale watchdog to
@@ -27,7 +27,7 @@ too if you plan to run 24/7 headless):
 
 ```
 git clone https://github.com/techpunch/agent-machine.git ~/agent-machine && cd ~/agent-machine
-claude --dangerously-skip-permissions
+claude --enable-auto-mode  # could use --dangerously-skip-permissions but I found auto fine
 ```
 
 Then in claude run `/setup`:
