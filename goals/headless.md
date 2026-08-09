@@ -1,7 +1,7 @@
 ---
 name: headless
 summary: Run with no monitor, keyboard or mouse
-order: 3
+order: 5
 recipes: [make-headless]
 ---
 

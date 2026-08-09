@@ -1,7 +1,7 @@
 ---
 name: lean
 summary: Stop running what nobody is there to use
-order: 7
+order: 3
 recipes: [make-lean]
 ---
 

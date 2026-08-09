@@ -22,10 +22,11 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
    waiting on only if they ask.
 
    Keep the order `goals` printed them in, always. That order is the `order:` field in each
-   goal file, and it is the sequence a human should take them in — host layer before agent
-   layer, optional extras last. It exists because this was got wrong by eye once already.
-   Re-sorting by what seems most interesting is not a judgement call you have been left; if
-   the order looks wrong, the fix is `order:` in the goal file, not the menu.
+   goal file, and it is one sequence over every goal, not over the ones still available —
+   dropping the `done` ones leaves the rest in the right order automatically. It exists
+   because this was got wrong by eye twice already. Re-sorting by what seems most
+   interesting is not a judgement call you have been left; if the order looks wrong, the fix
+   is `order:` in the goal file, not the menu.
 
    For a fresh box, say plainly that the first four together are the usual answer, so
    somebody who does not want to think can pick them and move on.
