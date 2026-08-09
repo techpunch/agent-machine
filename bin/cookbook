@@ -322,7 +322,7 @@ cmd_goals() {
 # that are not already satisfied, so coming back months later does not re-list the
 # Tailscale key you minted in March.
 cmd_preflight() {
-  local order targets r n seen="" pending="" p
+  local order targets r n pending="" unsure="" keep="" p want
   # Two substitutions, not one nested pair: expand_targets exits inside its own subshell,
   # so a nested $( ) would swallow the failure and leave an empty plan looking like success.
   targets=$(expand_targets "$@") || exit 1
@@ -332,14 +332,29 @@ cmd_preflight() {
     is_blocked "$r" && continue
     verify_rc "$r"; [ "$VERIFY_RC" -eq 0 ] && continue
     for n in $(needs_of "$r"); do
-      case " $seen " in *" $n "*) continue ;; esac
-      seen="$seen $n"
       [ -f "$PREREQS_DIR/$n.md" ] || { printf 'error: recipe %s needs undefined prereq %s\n' "$r" "$n" >&2; exit 1; }
-      pending="$pending $n"
+      # A verify that could not run is not a verify that failed, and treating them alike sent
+      # people off to arrange things they had already arranged — Full Disk Access, on a server
+      # whose SSH has been answering for hours. Separated rather than dropped, because rc 5 is
+      # what every Claude Code session gets for a root recipe, including the first run on a
+      # genuinely bare Mac where each of these really is outstanding.
+      if [ "$VERIFY_RC" -eq 5 ]; then
+        unsure="$unsure $n"
+      else
+        pending="$pending $n"
+      fi
     done
   done
 
-  if [ -z "$pending" ]; then
+  pending=$(printf '%s\n' $pending | /usr/bin/awk 'NF && !seen[$0]++' | /usr/bin/tr '\n' ' ')
+  # Needed by something genuinely unsatisfied beats needed by something unreadable.
+  for p in $unsure; do
+    case " $pending $keep " in *" $p "*) continue ;; esac
+    keep="$keep $p"
+  done
+  unsure="$keep"
+
+  if [ -z "${pending// /}" ] && [ -z "${unsure// /}" ]; then
     printf 'Nothing to arrange — everything this needs is already in place.\n'
     return 0
   fi
@@ -352,6 +367,17 @@ cmd_preflight() {
       /usr/bin/sed -n '/^---$/,/^---$/!p' "$PREREQS_DIR/$p.md" | /usr/bin/sed '/^$/d;s/^/  /'
     done
   done
+
+  if [ -n "${unsure// /}" ]; then
+    printf '\nCould not check — these belong to steps whose state only root can read, and this\n'
+    printf 'session has no terminal to sudo from. On a server that has been running a while\n'
+    printf 'they are usually long done. Listed rather than hidden because a bare Mac needs\n'
+    printf 'every one of them, and finding that out late costs an afternoon:\n'
+    for p in $unsure; do
+      printf '\n%s  [%s]\n' "$(prereq_meta "$p" summary)" "$p"
+      /usr/bin/sed -n '/^---$/,/^---$/!p' "$PREREQS_DIR/$p.md" | /usr/bin/sed '/^$/d;s/^/  /'
+    done
+  fi
   printf '\n'
 }
 
