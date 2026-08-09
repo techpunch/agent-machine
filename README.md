@@ -2,7 +2,8 @@
 
 Interactively turns a spare Mac into an always-on server that can run apps, AI assistants
 like OpenClaw and Hermes, and sandboxed coding agents. Reachable from any device on your
-tailnet with options to run headless and/or act as a VPN exit node.
+tailnet with options to run headless and/or act as a VPN exit node. Logs actions and
+and changes made to computer.
 
 WARNING: this project is suggested to be run with `claude --dangerously-skip-permissions`. It
 also suggests that you turn off FileVault encryption if you want your server to auto restart.
