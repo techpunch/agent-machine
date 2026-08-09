@@ -2,12 +2,20 @@
 . "$(dirname "$0")/../../lib/common.sh"
 need_var ADMIN_USER
 
-boot_epoch=$(/usr/sbin/sysctl -n kern.boottime | /usr/bin/sed -n 's/.*sec = \([0-9]*\).*/\1/p')
+# kern.boottime prints "{ sec = 1786279750, usec = 97045 } ...". Anchor the match: a greedy
+# .*sec matches through "usec" and captures the microseconds instead, which is always a small
+# number, always older than the ask, and so gates the reboot test forever.
+boot_epoch=$(/usr/sbin/sysctl -n kern.boottime | /usr/bin/sed -n 's/^{ *sec = \([0-9]*\).*/\1/p')
+[ -n "$boot_epoch" ] || die "could not read boot time from kern.boottime — cannot confirm a reboot"
 
 # Pass one: the server has to come back from a reboot with nobody touching it before any
 # cable comes out. Compare boot time against when we asked, so a stale marker can't pass.
-if [ -z "${REBOOT_TEST_ASKED_AT:-}" ] || [ "$boot_epoch" -lt "${REBOOT_TEST_ASKED_AT:-0}" ]; then
+if [ -z "${REBOOT_TEST_ASKED_AT:-}" ]; then
   set_server_var REBOOT_TEST_ASKED_AT "$(date +%s)"
+fi
+# Re-asking must not move the marker. Rewriting it on every gate makes the reboot the user
+# already did stop counting, so re-running apply to check quietly invalidates the test.
+if [ "$boot_epoch" -lt "$REBOOT_TEST_ASKED_AT" ]; then
   gate "Reboot survival test. Nothing has been unplugged.
 Reboot the server now:
   sudo reboot
@@ -31,9 +39,12 @@ cli=$(ts_cli) || die "tailscale is gone after the reboot"
   || die "Tailscale did not reconnect after the reboot — check that it is a login item (have-tailscale)"
 ok "Tailscale reconnected as $("$cli" ip -4 2>/dev/null | head -1)"
 
-/usr/sbin/systemsetup -getremotelogin 2>/dev/null | grep -q On \
-  || die "SSH is not enabled after the reboot — re-run make-remote-accessible"
-ok "SSH still enabled"
+# Connect to the port rather than reading the preference. systemsetup refuses without root,
+# and this recipe is root: no — so the old check failed for every real run. A completed TCP
+# handshake is also the stronger claim: sshd is accepting connections, not merely enabled.
+/usr/bin/nc -z -G 5 127.0.0.1 22 >/dev/null 2>&1 \
+  || die "nothing is answering on port 22 after the reboot — re-run make-remote-accessible"
+ok "SSH still answering on port 22"
 
 [ -n "${REBOOT_SURVIVED_AT:-}" ] || set_server_var REBOOT_SURVIVED_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
