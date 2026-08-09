@@ -11,9 +11,14 @@ if [ -z "${REBOOT_TEST_ASKED_AT:-}" ] || [ "$boot_epoch" -lt "${REBOOT_TEST_ASKE
   gate "Reboot survival test. Nothing has been unplugged.
 Reboot the server now:
   sudo reboot
-Wait for it to come back, reconnect over Tailscale, and re-run:
+This ends whatever is driving the run — the Claude Code session on this machine, or your SSH
+connection into it. That is expected; the state is on disk, so nothing is lost. Wait for the
+server to come back, reconnect, and re-run:
   ./bin/cookbook apply headless
-It will check that auto-login happened, Tailscale reconnected, and SSH still answers."
+It will check that auto-login happened, Tailscale reconnected, and SSH still answers.
+
+If a reboot is not convenient right now, stop here. Everything up to this point stays applied,
+and this recipe picks up where it left off whenever you come back to it."
 fi
 
 console=$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)
