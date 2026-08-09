@@ -250,7 +250,7 @@ cmd_list() {
 }
 
 cmd_status() {
-  local targets="$*" r rc
+  local targets="$*" r rc any_unknown=false
   [ -n "$targets" ] || targets="$(all_recipes)"
   for r in $targets; do
     exists "$r" || { printf 'error: no recipe named %s\n' "$r" >&2; exit 1; }
@@ -261,7 +261,8 @@ cmd_status() {
     local out; out=$(run_script "$r" verify.sh 2>&1); rc=$?
     printf '\n%-24s %s\n' "$r" "$(state_word $rc)"
     if [ $rc -eq 5 ]; then
-      printf '  needs root to check, and sudo is not available here\n'
+      printf '  this verify needs root and this shell has no terminal to sudo from\n'
+      any_unknown=true
       continue
     fi
     if [ $rc -ne 0 ]; then
@@ -272,6 +273,11 @@ cmd_status() {
       printf '%s\n' "${reasons:-$(printf '%s\n' "$out" | /usr/bin/sed 's/^/  /')}"
     fi
   done
+  # goals carries this footer and status did not, which left the one command people run to
+  # ask "how is this server" reporting a state with no way out of it. unknown is the absence
+  # of an answer, and reads far too easily as a recipe that failed.
+  $any_unknown && printf '\nunknown is not a failure and not "unapplied" — the check simply could not\nrun. Re-run from a terminal, or after `sudo -v`, for a real answer.\n' >&2
+  return 0
 }
 
 cmd_plan() {
