@@ -564,6 +564,24 @@ cmd_record() {
     printf 'client that reaches several servers collects one record per server rather than\n'
     printf 'scattering them through whichever directory you happened to be in.\n\n'
 
+    # Said here rather than anywhere earlier because this is the first command in the record
+    # that asks for the password, and the second and third are right behind it. Offering the
+    # fix before someone has felt the problem is an instruction; offering it here is a relief.
+    printf '## Not typing the password every time\n\n'
+    printf 'That scp asked for the admin password, and so will every ssh, rsync and git push\n'
+    printf 'after it. One command on the client stops that, for good:\n\n'
+    printf '```\nssh-copy-id %s\n```\n\n' "${SERVER_SLUG:-<slug>}"
+    printf 'It asks for the password once more, then never again from that machine. If it says\n'
+    printf 'you have no identity, make one first with `ssh-keygen -t ed25519` — accept the\n'
+    printf 'default path, and set a passphrase: macOS keeps it in the Keychain, so you type it\n'
+    printf 'once ever, and it is what stops a stolen laptop being immediate access to here.\n\n'
+    printf 'Run it on each client you use. Nothing secret arrives on the server — only the\n'
+    printf 'public half — which is worth knowing on a machine deliberately left with FileVault\n'
+    printf 'off. To untrust one machine later, delete its line from `~/.ssh/authorized_keys`\n'
+    printf 'here; the other clients are unaffected, which a shared password cannot manage.\n\n'
+    printf 'Passwords stay switched on. This adds a way in, it does not remove one, and\n'
+    printf 'turning them off is how people lock themselves out of a headless Mac.\n\n'
+
     printf '## On a client without the alias\n\n'
     printf 'Spell out the user: `%s@%s`. The short name still resolves — that part\n' \
       "${ADMIN_USER:-<user>}" "${SERVER_SLUG:-<slug>}"
