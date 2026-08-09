@@ -21,6 +21,15 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
    Leave out goals already `done`. If a goal is `blocked`, do not offer it — say what it is
    waiting on only if they ask.
 
+   One option per goal and nothing else. The list already multi-selects, so a combined
+   "both" or "all of them" option is noise that has to be read before it can be dismissed.
+   If several goals are the usual answer, say so in a sentence outside the menu.
+
+   Name the tool a goal installs in its description — tmux, `sbx` — rather than only the
+   outcome. Outcomes are how the menu is phrased, but somebody choosing is also deciding
+   what lands on their machine, and "a persistent terminal grid" does not tell them it is
+   tmux. If the goal file's prose does not name it, that is the file to fix.
+
    Keep the order `goals` printed them in, always. That order is the `order:` field in each
    goal file, and it is one sequence over every goal, not over the ones still available —
    dropping the `done` ones leaves the rest in the right order automatically. It exists
