@@ -19,12 +19,14 @@ August 2026 - Successfully used this project to successfully configure a Mac Min
   make sure tailscale is restarted if it crashes.
 - Acting as a tailscale exit node so I can selectively route traffic through my home internet
   connection when I'm at a cafe on untrusted wifi with my phone or laptop.
+- Running headless with an HDMI dummy dongle installed to maintain resolution, and no mouse or
+  keyboard attached.
 
 
 ## Quick Start
 
 On your spare Mac with a monitor and keyboard (have a cheap HDMI dummy dongle on hand or on order
-too if you plan to run 24/7 headless):
+if you plan to run 24/7 headless):
 
 ```
 git clone https://github.com/techpunch/agent-machine.git ~/agent-machine && cd ~/agent-machine
