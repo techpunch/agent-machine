@@ -35,6 +35,12 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
    the part that saves them an afternoon, so do not paste it as a wall of text.
 
    - Take the `before-you-start` items first, and do not move on until each is confirmed.
+   - Leave the `when: during` items alone. They are not preflight conversation: they may not
+     happen at all, and raising one turns something the run would have handled into a
+     decision the user has to make now. The exit-node approval is the case — a tailnet set up
+     from this cookbook already auto-approves, so the whole topic was noise for the person who
+     followed the instructions. If one does fire, the recipe raises it at the moment it
+     matters, which is the whole reason it is marked `during`.
    - Start anything slow immediately. FileVault decryption in particular runs for a long
      time and blocks the finish, so get it going while you do everything else.
    - If something is physical and they do not have it — the HDMI dongle — say so now and
@@ -55,9 +61,14 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
 
 6. Handle what comes back:
 
-   - Exit 3, a gate. Not a failure — a step the machine cannot take. Show the gate text
-     verbatim, because it names the exact toggle, dialog or physical action. Wait for them.
-     Then re-run the same command; everything already applied stays applied.
+   - Exit 3, a gate. Not a failure — a step the machine cannot take. Check it is still true
+     before you pass it on: a gate is a snapshot of the moment apply gave up, and some clear
+     themselves seconds later when a control plane catches up. Re-run the verify. If it
+     passes, the gate was stale — say the recipe is done and do not repeat the instructions,
+     because asking someone to go and approve what is already approved is worse than saying
+     nothing. If it is real, show the gate text verbatim, because it names the exact toggle,
+     dialog or physical action. Wait for them. Then re-run the same command; everything
+     already applied stays applied.
    - Exit 1, a failure. Read the verify output and say what actually broke and what it
      means. Say which recipes did apply before it stopped — the chain halts but nothing
      rolls back.
