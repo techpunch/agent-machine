@@ -227,11 +227,14 @@ project. SSH in over Tailscale and attach to that one session; each pane runs
 `sbx run --clone <agent>`, which attaches you to the agent directly, so a pane is a session and
 there is nothing to connect to per project. From the phone it is the same command from an SSH client.
 
-Claude Code Remote Control is no longer ruled out — sbx v0.39.0 added a `claude.remoteControl`
-setting that lets `/remote-control` reach an agent in a sandbox — but it drives one session, so it
-sits beside the grid rather than replacing it, and its inbound half is still unreliable.
-[`have-coordination`](../recipes/have-coordination/recipe.md) carries the command and where it
-currently stands.
+The agents' own remote-control features sit beside this rather than replacing it, and for the same
+reason in both cases: each drives one session, where the grid surveys every project. Claude Code's is
+no longer ruled out — sbx v0.39.0 added a `claude.remoteControl` setting that lets
+`/remote-control` reach an agent in a sandbox, though its inbound half is still unreliable. Codex
+Remote never had the proxy problem and has a worse one: it is set up from the ChatGPT desktop app,
+which a headless server cannot present, and it drives Codex on the host rather than in a sandbox. Its
+SSH-host mode is the one that matches this design, and it is untried.
+[`have-coordination`](../recipes/have-coordination/recipe.md) carries both, with the commands.
 
 Why this rather than an orchestrator. The people running this at volume — Steinberger with a 3×3
 terminal grid, Willison with a grid of plain terminals across repos — agree the bottleneck is not
@@ -279,6 +282,8 @@ network-exposed daemon, and the design should be revisited rather than extended.
   not reach a sandboxed agent, and
   [sbx v0.39.0](https://github.com/docker/sbx-releases/releases/tag/v0.39.0), which added the
   setting that lets it
+- [Codex Remote connections](https://developers.openai.com/codex/remote-connections) — the desktop
+  app requirement, and the SSH-host mode that is the only one shaped like this machine
 
 ## What is left to pin
 

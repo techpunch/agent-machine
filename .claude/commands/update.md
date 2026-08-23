@@ -35,7 +35,9 @@ produces a commit, not a patched machine, and the fix reaches every server that 
 - `sbx` itself. It is proprietary and free at time of writing — check that both are still
   true, and look for releases that fix something worth having. A newer version for its own
   sake is not a reason; a fix is.
-- Tailscale and Claude Code. Same question, plus any advisories.
+- Tailscale, Claude Code and Codex. Same question, plus any advisories. Both agents have a
+  remote-control feature whose state in a sandbox has moved twice already — `have-coordination`
+  records where each stands, and that is exactly the kind of claim that goes stale silently.
 - The blocked recipes. Read each `blocked_by` and ask whether it is still true. This is the
   one that rots quietest: a recipe deferred because "nothing needs it today" stays deferred
   long after something does. If a reason has expired, say so and propose unblocking.

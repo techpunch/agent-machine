@@ -141,13 +141,17 @@ stored in the host keychain, and the proxy injects it into outbound requests on 
 sandbox sees a sentinel value. So the agent can make authenticated calls and cannot read, log or
 exfiltrate the credential, and every later sandbox is authenticated without signing in again.
 
+Codex arrives at the same place from the other end: `sbx secret set openai --oauth` runs the flow on
+the host to begin with, and the tokens go to the host keychain and are injected the same way. Where
+you type the sign-in differs; what the sandbox holds afterwards does not.
+
 That has three consequences worth being explicit about:
 
 - The list above is now the whole list. There is no "except the one credential we accept" clause.
 - An API key is not a safer alternative. It is injected by the same proxy, so it buys no isolation
   the subscription does not already have, and it swaps a flat subscription for metered billing.
 - Revocation is still worth knowing before you need it: sign out everywhere from your Anthropic
-  account settings. Do that the moment anything looks off — an unexplained session, unfamiliar usage,
+  account settings, or from your ChatGPT ones for Codex. Do that the moment anything looks off — an unexplained session, unfamiliar usage,
   an agent that behaved strangely.
 
 What this does not cover is the model's own output. A compromised agent cannot steal the token, but

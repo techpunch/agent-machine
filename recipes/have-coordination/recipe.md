@@ -64,3 +64,27 @@ landed — the outbound half connects while the inbound stream stalls, so comman
 hang until something is typed in the sandbox, reported against v0.39.0 in
 docker/sbx-releases#12 and unresolved. Turn it on if you want the phone-browser path anyway; it costs
 one command and nothing else here depends on it.
+
+Codex Remote is the equivalent on the OpenAI side, and it fails here for a different reason — not the
+proxy, the shape. It is driven from the ChatGPT desktop app: Settings > Connections >
+Control this Mac or PC, then scan a QR code with the phone to pair it. OpenAI says outright that you
+cannot set it up from the Codex CLI or the IDE extension, so there is no headless path in — a server
+would need the desktop app installed, signed in, awake, and a screen-sharing session to scan the code
+from. And what it then drives is Codex on that host's own filesystem, which is the thing this repo
+does not do. Agents run in a microVM here, and a phone that can start host-side work has undone the
+boundary the sandbox exists for.
+
+The mode that does fit the shape of this machine is Codex Remote's SSH host: the desktop app on your
+laptop reads a concrete `Host` alias from `~/.ssh/config`, starts a Codex app server on that machine
+over SSH, and runs chats against its filesystem and shell. Tailscale is already the transport OpenAI
+asks for here — the guide says not to expose app-server transports on a shared or public network and
+to use a VPN or mesh network instead. Two things stop it being a recommendation rather than a note.
+It wants `codex` on the remote login shell's `PATH`, which means installing an agent on the host that
+this cookbook deliberately keeps agent-free. And it still runs outside the sandbox, so pointing it at
+`<name>.sbx` from `sbx setup ssh` rather than at the server is the only version worth having — those
+aliases resolve on the server rather than on your laptop, so it would need a jump through the server,
+and nobody here has tried it. If you do, the answer belongs in this file.
+
+Neither of these replaces the grid, and one reason is structural rather than a defect: the phone
+reaches an SSH host through the desktop app, so the always-on machine is now your laptop. SSH and
+tmux need nothing awake but the server.

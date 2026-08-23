@@ -43,7 +43,9 @@ hardcoding them. Filling this block in is what makes a copy of the cookbook your
       - Tailnet name / org: `<FILL IN>`
       - Reusable `tag:host` auth key — stored at: `<FILL IN>`
 - [ ] Agent accounts and keys — set up once, servers authenticate against them. A server runs one or
-      more of these; you sign in with `/login` inside a sandbox on first use.
+      both of these, and needs at least one. Signing in is once per account, not once per project
+      or per server — Claude Code with `/login` inside a sandbox, Codex on the host with
+      `sbx secret set openai --oauth`. Either way the token ends up in the host keychain.
       - Claude Code (Anthropic) — subscription login or `ANTHROPIC_API_KEY`: `<FILL IN>`
       - Codex (OpenAI) — ChatGPT plan or `OPENAI_API_KEY`: `<FILL IN>`
 

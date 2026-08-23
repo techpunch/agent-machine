@@ -16,7 +16,7 @@ that can be read out and used. "It's only for git" does not change what it is.
 sandbox as a git remote. No token anywhere, no GitHub round trip:
 
 ```
-sbx run --clone claude            # agent works, commits to a branch
+sbx run --clone claude            # or codex; agent works, commits to a branch
 git fetch sandbox-<name>          # on the Mac, in your real checkout
 git log -p sandbox-<name>/<branch>
 git merge --ff-only sandbox-<name>/<branch>

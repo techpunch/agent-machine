@@ -1,9 +1,9 @@
 # agent-machine
 
-Interactively turns a spare Mac into an always-on server that can run apps, AI assistants
-like OpenClaw and Hermes, and sandboxed coding agents. Reachable from any device on your
-tailnet with options to run headless and/or act as a VPN exit node. Logs actions and
-and changes made to computer.
+Interactively turns a spare Mac into an always-on server that runs sandboxed coding agents —
+Claude Code and Codex, one microVM per project. Reachable from any device on your tailnet
+with options to run headless and/or act as a VPN exit node. Logs actions and changes made
+to computer.
 
 WARNING: this project is suggested to be run with `claude --dangerously-skip-permissions`. It
 also suggests that you turn off FileVault encryption if you want your server to auto restart.
@@ -80,7 +80,7 @@ finished step is a no-op.
 | Keep running unattended | Never sleeps, comes back by itself after a power cut |
 | Run with no monitor or keyboard | Proves reboot survival first, then you unplug |
 | Route your traffic through it | Use it as a Tailscale exit node on untrusted wifi |
-| Run coding agents on it | WIP - A microVM per agent, egress under policy, nothing shared with the Mac |
+| Run coding agents on it | WIP - Claude Code or Codex, a microVM each, egress under policy |
 | Drive many projects at once | WIP - A persistent terminal grid you attach to from anywhere |
 | Stop running what nobody uses | Spotlight, screen saver and desktop widgets off, so agents get the CPU |
 

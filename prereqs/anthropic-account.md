@@ -1,8 +1,12 @@
 ---
 name: anthropic-account
-summary: A Claude account with a paid plan
+summary: A Claude account with a paid plan, if you want Claude Code on this server
 when: during
 ---
+Only if you want Claude Code. This server runs Claude Code, Codex, or both, and neither needs the
+other — the Codex side is [`openai-account.md`](openai-account.md). You do need at least one of them,
+or the agent sandbox has nothing to run.
+
 The agent signs in as you, so you need a Claude Pro or Max subscription — the same login you use
 anywhere else.
 

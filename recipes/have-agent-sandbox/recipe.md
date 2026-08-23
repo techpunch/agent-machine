@@ -2,7 +2,7 @@
 name: have-agent-sandbox
 summary: Docker Sandboxes installed and signed in, so agents run in microVMs.
 requires: [have-homebrew]
-needs: [docker-account, anthropic-account]
+needs: [docker-account, anthropic-account, openai-account]
 root: no
 gates: the Docker personal access token, and the agent sign-in inside a sandbox
 ---
@@ -23,6 +23,7 @@ remain your problem.
 
 ```
 sbx run --clone --kit recipes/have-agent-sandbox/kit --name <project> claude
+sbx run --clone --kit recipes/have-agent-sandbox/kit --name <project> codex
 git fetch sandbox-<project>       # bring the work back, on the host
 ```
 
@@ -46,6 +47,32 @@ only; keeping secrets out of the directory is still your job.
 Sandbox disks default to 20 GB, which a large monorepo plus a dependency tree can reach.
 `DOCKER_SANDBOXES_ROOT_SIZE=40g sbx run ...` raises it, and `DOCKER_SANDBOXES_DOCKER_SIZE` covers the
 separate Docker data disk.
+
+## Codex as well as Claude Code
+
+Both are in scope for this machine and `sbx` runs either — swap the agent name and everything else on
+this page is unchanged. A sandbox is per project, not per agent, so `--name` is what decides whether
+you get a second sandbox or reattach to the one you already have.
+
+Three differences worth knowing before the first run:
+
+- The sign-in starts on the host rather than inside the sandbox. `sbx secret set openai --oauth`
+  opens a browser on the machine you run it on, which on a headless server means screen sharing —
+  see [`../../prereqs/openai-account.md`](../../prereqs/openai-account.md). Claude Code's `/login` is
+  typed inside a sandbox and reaches the host from there. Both end the same way: tokens in the host
+  keychain, injected by the proxy, never written inside a sandbox.
+- Codex starts in bypass mode. With no extra arguments the sandbox runs
+  `codex --dangerously-bypass-approvals-and-sandbox`, which is the same posture this repo argues for
+  and the reason the microVM has to be real. The trap is the argument form: flags after `--` are
+  added to the defaults, but a bare word replaces them, so `sbx run codex -- "fix the build"` quietly
+  drops bypass mode and you get an agent asking permission for everything. Lead with the flag —
+  `sbx run codex -- --dangerously-bypass-approvals-and-sandbox "fix the build"`.
+- `~/.codex` does not follow it in, exactly as `~/.claude` does not. Only project-level config in the
+  working directory is visible inside the sandbox. That is what the kit is for, and the kit is
+  agent-neutral: a mixin's context is written beside whichever profile file the base agent owns —
+  `CLAUDE.md` for Claude Code, `AGENTS.md` for Codex — so the denial-reporting guidance reaches both.
+  A kit that did carry agent-specific settings would have to pin one with `requires.agent`, and ours
+  deliberately does not.
 
 ## The network policy
 
@@ -141,8 +168,8 @@ reaching for before the allowlist grows past a screenful.
 The Docker token authenticates `sbx` itself and belongs in the Keychain, fetched by `secret_get` like
 the tailnet key. Read scope is enough. It never reaches `server.env` and never appears in argv.
 
-The agent's own sign-in happens inside a sandbox with `/login`, and it is once — not once per
-sandbox. The token it produces is stored on the host and injected into outbound requests by the
+The agent's own sign-in is once — not once per sandbox. Claude Code does it inside a sandbox with
+`/login`; Codex does it on the host with `sbx secret set openai --oauth`. The token it produces is stored on the host and injected into outbound requests by the
 proxy, so it is never written inside a sandbox, the agent cannot read or exfiltrate it, and later
 sandboxes are authenticated without signing in again. Destroying a sandbox does not cost you the
 login.

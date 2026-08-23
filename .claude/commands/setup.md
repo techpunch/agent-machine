@@ -97,8 +97,9 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
 
 7. Finish with what they can now do, in commands rather than concepts. The two that matter
    day to day are on the server: `agents` to attach to the terminal grid, and
-   `sbx run --clone claude` to put one project in its own sandbox. Then two things they will
-   need later and will not think to ask about:
+   `sbx run --clone claude` to put one project in its own sandbox — `codex` in place of
+   `claude` if that is the account they have. Then two things they will need later and will
+   not think to ask about:
 
    Use the server's short name in every command you show them — `ssh <slug>`, never
    `ssh <user>@<slug>.<tailnet>.ts.net`. MagicDNS is on by default and resolves the short
