@@ -44,16 +44,23 @@ and the posture here is to bring the machine back unattended but launch agent wo
 An SSH client on the phone — Termius, Blink, Termux — over Tailscale, then the same
 `ssh <server> -t agents`. Same grid, same panes, nothing extra installed on the server.
 
-Not Claude Code Remote Control. `/rc` works for an agent running on the host, but not for one in a
-sandbox, and the reason is structural rather than a bug waiting to be fixed. The proxy that makes the
-sign-in safe works by rewriting the `Authorization` header on requests to `api.anthropic.com`;
-Remote Control registers a purpose-scoped token for its polling endpoint, and that token is exactly
-what gets overwritten. The substituted one carries inference scopes only, so the poll is refused.
-`remote-control.anthropic.com` also fails to resolve inside the VM.
+Claude Code Remote Control is a second way in, and it is off by default. `/remote-control` used to
+fail inside a sandbox: the proxy that makes the sign-in safe rewrites the `Authorization` header on
+requests to `api.anthropic.com`, and Remote Control registers a purpose-scoped token for its polling
+endpoint that got overwritten with an inference-only one, so the poll was refused. sbx v0.39.0
+(19 August 2026) added a setting for it:
 
-There is no setting for this. `sbx policy allow network` has no TLS-bypass flag, the choice between
-intercepting and passing a host through is internal, and a self-supplied token does not help because
-`claude setup-token` credentials cannot establish Remote Control sessions by design. Tracked upstream
-as docker/sbx-releases#8; nothing has shipped as of v0.37.1. If it lands, this section is worth
-revisiting — but SSH plus the grid is the better fit for this machine anyway, because it surveys
-every project at once rather than driving one session.
+```
+sbx settings set claude.remoteControl true
+```
+
+Host-wide, set once. That is also all Docker publishes: the release note and the Claude Code agent
+page name the setting and say nothing about what it changes in the intercept, so whether the
+host-held credential stays masked inside the sandbox is undocumented either way.
+
+Not turned on by this recipe, for two reasons. The grid is still the way in: it surveys every project
+at once rather than driving one session, which is what this machine is for. And the fix is half
+landed — the outbound half connects while the inbound stream stalls, so commands sent from a phone
+hang until something is typed in the sandbox, reported against v0.39.0 in
+docker/sbx-releases#12 and unresolved. Turn it on if you want the phone-browser path anyway; it costs
+one command and nothing else here depends on it.

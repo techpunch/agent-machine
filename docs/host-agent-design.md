@@ -227,6 +227,12 @@ project. SSH in over Tailscale and attach to that one session; each pane runs
 `sbx run --clone <agent>`, which attaches you to the agent directly, so a pane is a session and
 there is nothing to connect to per project. From the phone it is the same command from an SSH client.
 
+Claude Code Remote Control is no longer ruled out — sbx v0.39.0 added a `claude.remoteControl`
+setting that lets `/remote-control` reach an agent in a sandbox — but it drives one session, so it
+sits beside the grid rather than replacing it, and its inbound half is still unreliable.
+[`have-coordination`](../recipes/have-coordination/recipe.md) carries the command and where it
+currently stands.
+
 Why this rather than an orchestrator. The people running this at volume — Steinberger with a 3×3
 terminal grid, Willison with a grid of plain terminals across repos — agree the bottleneck is not
 spawning or coordinating agents, it is how fast you can review what they produce. Tooling that does
@@ -269,8 +275,10 @@ network-exposed daemon, and the design should be revisited rather than extended.
 - [Simon Willison — Embracing the parallel coding agent lifestyle](https://simonwillison.net/tags/parallel-agents/)
 - [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/) and its
   [default security posture](https://docs.docker.com/ai/sandboxes/security/defaults/)
-- [Remote Control inside sandboxes](https://github.com/docker/sbx-releases/issues/8) — why `/rc` does
-  not reach a sandboxed agent
+- [Remote Control inside sandboxes](https://github.com/docker/sbx-releases/issues/8) — why `/rc` did
+  not reach a sandboxed agent, and
+  [sbx v0.39.0](https://github.com/docker/sbx-releases/releases/tag/v0.39.0), which added the
+  setting that lets it
 
 ## What is left to pin
 
@@ -285,12 +293,17 @@ Genuinely open:
   added domains, a doc broker, or a wider policy for research sandboxes is a first-run finding. See
   "Research versus containment" in [`secrets-and-egress.md`](secrets-and-egress.md).
 
-Two smaller questions are open only because the answers are not published anywhere, rather than
-because the design is undecided. Both are one command on a real server:
+Three smaller questions are open only because the answers are not published anywhere, rather than
+because the design is undecided. Each is one command on a real server:
 
 - Whether a second sandbox re-prompts for `/login` or picks the host-held credential up silently.
   Everything about the design says silently. Docker does not say so outright in the get-started
   guide, the credentials page, the Claude Code or Droid agent pages, the FAQ, or the release notes.
+- Whether turning on `claude.remoteControl` costs the credential masking. A stock sandbox holds a
+  sentinel in `~/.claude/.credentials.json` while the real token stays on the host, and the
+  community workaround for this same problem bought Remote Control by bypassing the intercept, which
+  put the real token in the sandbox. Docker's own fix may well not, but neither the release note nor
+  the Claude Code agent page says. One `cat` inside a sandbox with the setting on.
 - Whether `sbx policy init <preset>` succeeds on a fresh install with no policy to replace. It is
   documented as the non-interactive way to set a preset, and `have-agent-sandbox` treats a failure as
   fatal rather than a warning, because an unset policy means the first `sbx run` prompts and a prompt
