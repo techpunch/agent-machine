@@ -41,9 +41,10 @@ fi
 probe="verify-probe-$$"
 if with_timeout 180 "$sbx" create --name "$probe" >/dev/null 2>&1; then
   ok "created a probe sandbox"
-  with_timeout 60 "$sbx" rm "$probe" >/dev/null 2>&1 \
+  # Since sbx v0.45.0 removal asks for confirmation; nobody is there to answer it.
+  with_timeout 60 "$sbx" rm --force "$probe" >/dev/null 2>&1 \
     && ok "removed it again" \
-    || miss "created sandbox '$probe' but could not remove it — clean up with: sbx rm $probe"
+    || miss "created sandbox '$probe' but could not remove it — clean up with: sbx rm --force $probe"
 else
   miss "could not create a sandbox — sbx is installed and signed in but not working"
 fi
