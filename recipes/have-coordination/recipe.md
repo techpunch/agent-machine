@@ -23,6 +23,11 @@ to SSH into per project — one connection to the server reaches every agent. If
 sandbox rather than its agent, that is `sbx setup ssh` once, then `ssh <sandbox>.sbx`, which is an
 escape hatch for debugging a build rather than the way in.
 
+Why tmux rather than Zellij, herdr or an agent manager is argued in
+[`../../docs/host-agent-design.md`](../../docs/host-agent-design.md). herdr is the one alternative
+that passes on paper and is worth trialling inside this grid; that doc has the test that would make
+it the default.
+
 ## Why the grid is on the host now
 
 It used to live inside the VM, because the VM was the one long-lived guest everything ran in. With

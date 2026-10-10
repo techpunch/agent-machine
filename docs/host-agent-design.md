@@ -244,13 +244,14 @@ the model is doing. Adopt a worktree board only when reading diffs across many t
 that hurts. Not before.
 
 Why tmux specifically, since this category churns fast and the question keeps coming back. The
-alternatives were compared against three requirements this machine actually has, and each fails one
-structurally rather than narrowly:
+alternatives were compared against three requirements this machine actually has, and all but one
+fail one structurally rather than narrowly:
 
 | | Survives disconnect | Headless server | Works with `--clone` |
 |---|---|---|---|
 | tmux | yes | yes | yes |
 | Zellij | yes | yes | Codex scrollback broken over SSH |
+| herdr | documented; untested for an SSH-started server on macOS | yes | yes, with `HERDR_AGENT` on the `sbx` command |
 | cmux, Zentty | no | no | — |
 | claude-squad, workmux, NTM | yes | yes | no — git worktrees |
 | Conductor, Nimbalyst, Vibe Kanban | no | no | — |
@@ -264,8 +265,68 @@ well as Claude Code. The agent managers isolate work with a git worktree per age
 theirs is also the weaker one, since a worktree is not a microVM. The desktop review apps assume a
 machine you look at.
 
-So tmux stays, and it stays for a reason that will not move: the requirement doing the eliminating is
-headless-plus-SSH-plus-sbx-owns-isolation, which is the shape of this design rather than a taste.
+So tmux stays, and for everything above it stays for a reason that will not move: the requirement
+doing the eliminating is headless-plus-SSH-plus-sbx-owns-isolation, which is the shape of this design
+rather than a taste. herdr is the exception, and gets its own section.
+
+### herdr, the one that passes on paper
+
+[herdr](https://github.com/herdrdev/herdr) is an agent multiplexer: a single Rust binary, Apache-2.0
+since v0.8.0, at 0.9.3 in homebrew-core as of October 2026 and releasing every week or two. It is a
+background server plus a TUI client, so it needs no GUI session, and it replaces tmux rather than
+sitting on it — its own panes, prefix key (`ctrl+b`), copy mode and named sessions. Detach is
+`ctrl+b q`, reattach is running `herdr` again, and its README says panes keep running when you
+close the client or lose the SSH connection. A pane runs any command; worktrees are offered, not
+required, so `sbx run --clone` from the main checkout works.
+
+What it adds is the thing tmux does not have: each pane carries a state — blocked, working, done,
+idle — rolled up into a sidebar, a picker that jumps to whatever is blocked, and notifications that
+work over SSH. On a grid of sandboxes that is the difference between scanning every pane and being
+told which one wants you. Its docs also cover phones directly: plain SSH, and a TUI that adapts to
+narrow screens.
+
+Three things about how that works here, because the sandbox changes them:
+
+- It detects an agent from the pane's foreground process, and under `sbx` that process is `sbx`,
+  not `claude`. The documented fix is a hint on the host-side command, not inside the sandbox —
+  `HERDR_AGENT=claude sbx run --clone --name <project> claude` — and the maintainers closed a
+  request to look inside sandboxes as working as designed
+  ([herdr#2181](https://github.com/herdrdev/herdr/issues/2181)). Without the hint you get a plain
+  multiplexer with a sidebar of unknowns. With it, state comes from reading the screen against a
+  detection manifest, which is heuristic: an unrecognised prompt reads as idle, not blocked.
+- Its Claude Code and Codex integration hooks install into `~/.claude` and `~/.codex` on the host and
+  cannot reach an agent in a microVM. That is fine, and one consequence is worth closing off rather
+  than relying on: native session restore relaunches an agent with its own resume command, and on
+  this machine that would run on the host, outside the sandbox. Set
+  `[session] resume_agents_on_restore = false` in `~/.config/herdr/config.toml` so it cannot.
+- It fetches detection-manifest updates from herdr.dev, which is outbound traffic from the host.
+  `[update] manifest_check = false` turns it off; either way, decide rather than discover it.
+
+Why it is not the default yet. Survival is the requirement the whole grid exists for, and here it is
+documented but unproven on this exact shape: an open bug,
+[herdr#4920](https://github.com/herdrdev/herdr/issues/4920), has the server shut down — taking every
+pane with it — when the macOS terminal app that started it quits, and nobody has checked whether a
+server started from an SSH login outlives that login. Upgrading is also costlier than tmux: the old
+server keeps running until `herdr server stop`, which kills the panes, and the live handoff that
+avoids that is experimental and unavailable to brew installs. On a 0.x tool releasing this often,
+that is a real cost on the always-on path.
+
+The options, then:
+
+- Instead of tmux. The right end state if it proves out — it fails none of the three requirements,
+  which nothing else in the table manages, and the state sidebar is a real gain. Not before the
+  survival test below passes.
+- Inside tmux. Supported, and tmux keeps owning survival while herdr adds the sidebar. The cost is
+  two prefix layers that both default to `ctrl+b`, so one has to move, and more to drive from a
+  phone. A reasonable way to trial it. The reverse, tmux inside herdr, is pointless: herdr then sees
+  `tmux` as the pane process and loses detection.
+- tmux only. What `have-coordination` installs today, and nothing above makes it wrong.
+
+The test that decides it, on a real server: SSH in, run `herdr`, start
+`HERDR_AGENT=claude sbx run --clone --name <project> claude` in a pane, drop the SSH connection
+without detaching, reconnect, and confirm the agent is still running and its state is right. Then
+repeat from a phone with Codex, since scrollback over SSH is what ruled out Zellij. If that passes,
+swapping tmux for herdr in `have-coordination` is the next change, with the config above pinned.
 
 Deliberately absent: a dispatcher that takes a request from a chat app and routes it to an agent
 unattended. That is the natural next thing to want, and it is the point at which this stops being a
@@ -274,6 +335,9 @@ network-exposed daemon, and the design should be revisited rather than extended.
 
 ### Sources
 
+- [herdr](https://github.com/herdrdev/herdr) and [its docs](https://herdr.dev/docs/), including
+  [#2181](https://github.com/herdrdev/herdr/issues/2181) (running under `sbx`) and
+  [#4920](https://github.com/herdrdev/herdr/issues/4920) (server lifetime on macOS)
 - [Peter Steinberger — Just Talk To It](https://steipete.me/posts/just-talk-to-it)
 - [Simon Willison — Embracing the parallel coding agent lifestyle](https://simonwillison.net/tags/parallel-agents/)
 - [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/) and its
