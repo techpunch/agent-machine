@@ -46,7 +46,10 @@ the grid with it — but it takes every agent with it too, so nothing extra is l
 Neither the sandbox nor the grid comes back by itself. That is deliberate — auto-recreating panes
 would mean auto-starting agent runs, and the posture here is to bring the machine back unattended but
 launch agent work by hand. The first `agents` after a reboot starts the sandbox, because `sbx exec`
-starts a stopped one, and creates a fresh grid in it. The checkouts inside are still there.
+starts a stopped one, and creates a fresh grid in it. The checkouts inside are still there; the
+agents are not, and each has to be started again by hand. Resuming them all at once is in
+[`../../BACKLOG.md`](../../BACKLOG.md), and herdr does it natively — one of the reasons it is the
+alternative worth trialling.
 
 ## Not yet confirmed on a real server
 

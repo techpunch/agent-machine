@@ -355,6 +355,8 @@ What it adds over tmux, in the shape this machine now has — one sandbox, the g
   command (`claude --resume <id>`, `codex resume <id>`). With tmux a reboot means relaunching every
   agent by hand. It waits for you to attach, so it keeps the posture of launching agent work by hand,
   and the resumed agents are still in bypass mode because that comes from their config, not a flag.
+  This is the item in [`../BACKLOG.md`](../BACKLOG.md) — resuming every session after a restart —
+  delivered by herdr itself rather than by hooks and a boot script this repo would have to maintain.
 - Inside the sandbox it sees `claude` and `codex` as ordinary processes. On the Mac it saw only
   `sbx`, which needed a `HERDR_AGENT` hint on every command, and the maintainers closed the request
   to look inside sandboxes as working as designed
