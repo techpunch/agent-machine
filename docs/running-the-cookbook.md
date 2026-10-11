@@ -182,7 +182,7 @@ tell you that, because a failure never reaches it.
 for a single command and never written down.
 
 `server.env` is the third file, and it is config rather than a record — `SERVER_NAME`, `ADMIN_USER`,
-`TS_IP`, `SBX_POLICY`, and whatever else recipes discover. Mode 600, shell-sourceable, and never a
+`TS_IP`, `SBX_POLICY`, `SBX_SANDBOX`, and whatever else recipes discover. Mode 600, shell-sourceable, and never a
 place for a secret: anything with read access to the server can read it.
 
 Keep a human copy of all this somewhere off the server. See README.

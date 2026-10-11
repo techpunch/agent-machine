@@ -44,10 +44,14 @@ hardcoding them. Filling this block in is what makes a copy of the cookbook your
       - Reusable `tag:host` auth key — stored at: `<FILL IN>`
 - [ ] Agent accounts and keys — set up once, servers authenticate against them. A server runs one or
       both of these, and needs at least one. Signing in is once per account, not once per project
-      or per server — Claude Code with `/login` inside a sandbox, Codex on the host with
+      or per server — Claude Code with `/login` inside the sandbox, Codex on the host with
       `sbx secret set openai --oauth`. Either way the token ends up in the host keychain.
       - Claude Code (Anthropic) — subscription login or `ANTHROPIC_API_KEY`: `<FILL IN>`
       - Codex (OpenAI) — ChatGPT plan or `OPENAI_API_KEY`: `<FILL IN>`
+- [ ] GitHub token agents push with — a fine-grained token limited to the repos agents work on, and
+      a ruleset protecting `main` on each of them. Per server or shared, but never broader than those
+      repos. How to make both is in [`../prereqs/github-token.md`](../prereqs/github-token.md).
+      - Stored at, and expires on: `<FILL IN>`
 
 ## Tailnet policy
 
@@ -136,9 +140,11 @@ Two things this does not cover, both worth knowing rather than discovering:
   traffic through a machine you are treating as potentially compromised, do not advertise it as an
   exit node.
 - The LAN. ACLs govern the tailnet, not the physical network the server sits on. A compromised host
-  can still reach other machines on its own subnet. Agent sandboxes cannot, since their egress
-  policy blocks private ranges, but the host is not covered by either mechanism. Put the server
-  somewhere you are comfortable with that, or segment it.
+  can still reach other machines on its own subnet. The agent sandbox cannot, because
+  `have-agent-sandbox` adds deny rules for the private ranges that `allow-all` alone would leave
+  open, but nothing does the same for the host. The design treats the LAN as out of scope on the
+  condition that nothing on it trusts the server. Put the server somewhere that stays true, or
+  segment it.
 
 ## Account safety — reduce ban-cascade risk
 

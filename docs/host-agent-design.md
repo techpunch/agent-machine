@@ -3,11 +3,90 @@
 Why a server is put together this way. The step-by-step lives in the recipes under
 [`../recipes/`](../recipes/); this is the reasoning behind them.
 
-The scope is Claude Code and Codex. Earlier versions of this design also covered OpenClaw and Hermes,
-and built the agent layer out of a hand-configured Colima VM with its own firewall rules and
-container split — both are gone, and several arguments here are simpler for it.
+## What this machine is for
 
-## What this design is for
+1. Protect the Mac — its files, its Keychain, its services, and the Claude Code session that runs
+   this cookbook on it. The LAN is out of scope: nothing on it trusts this machine.
+2. One sandbox runs every coding agent, with permission prompts skipped.
+3. tmux runs inside that sandbox. One `agents` command on the Mac attaches to it.
+4. The sandbox keeps its own clone of every repo it works on. Nothing from the Mac is mounted.
+5. Open internet, so agents can read any documentation site.
+6. Claude, Codex and GitHub are signed in once on the Mac and injected into the sandbox, so agents
+   can use them but never read them.
+7. Agents push branches to GitHub. A protected `main` and a token limited to the relevant repos cap
+   what that can cost.
+8. Simple over layered: one blast radius for every project is accepted.
+
+Everything below is the reasoning for those, and for the host layer they sit on.
+
+## The decisions, and why
+
+### sbx rather than Colima
+
+Both put agents in a Linux VM, so both keep an agent off the Mac's files and Keychain — as long as
+nothing is mounted. What separates them is what each needs from us to get there:
+
+- Credentials. sbx stores the agents' sign-ins and the GitHub token on the Mac and adds them to
+  requests on the way out; an agent can use them and cannot read them, so it cannot carry them away.
+  Colima has no equivalent. A token used in a Colima VM is a file in that VM, readable by every agent
+  and by anything that hijacks one. Building the sbx behaviour ourselves means a credential-injecting
+  proxy, which is exactly the kind of security code this cookbook stopped maintaining.
+- Sharing the Mac's own sessions does not work in Colima anyway. On macOS, Claude Code and `gh` keep
+  their logins in the Keychain, so mounting `~/.claude` or `~/.config/gh` into a VM does not bring the
+  login with it.
+- Mounting `~/.claude` would also be an attack on the Mac. An agent that can write
+  `~/.claude/settings.json` can add a hook, and the Claude Code session on the Mac — which runs this
+  cookbook with permissions skipped — would then run it. It is the `.git/config` attack in
+  [`pushing-agent-code.md`](pushing-agent-code.md), pointed at the most privileged process on the
+  machine.
+- Colima's defaults point the wrong way. Lima's default mounts the home directory, and the Colima
+  config left on the first server mounted it writable — `~/.ssh`, `~/.claude` and this repo, all
+  reachable from the VM. Every protection has to be configured in, where sbx starts with nothing
+  mounted.
+- The earlier Colima setup needed a hand-written firewall, and three real defects surfaced in it in a
+  single review: a firewall that filtered only locally originated traffic so every container bypassed
+  it, a verify that tested the wrong network namespace and so always passed, and a container tier
+  that could not authenticate.
+
+What sbx costs: it is proprietary, it needs a Docker account (free today), and it moves fast —
+several releases between v0.42 and v0.47 changed commands the cookbook used. `/update` exists to
+absorb that. The host layer deliberately does not depend on sbx, so the machine stays useful if that
+ever changes.
+
+### One sandbox, not one per project
+
+Per-project sandboxes keep one project's compromise out of another's files. That is real, and it is
+not what this machine is for: every project here belongs to one person at one trust level, and the
+boundary worth paying for is the one around the Mac. One sandbox is one thing to create, size, keep
+running and attach to, with one set of installed tools. The cost is accepted rather than overlooked:
+a prompt injection in one project's dependencies can reach every other project in the sandbox, and
+push branches anywhere the GitHub token reaches.
+
+### tmux inside the sandbox
+
+With one sandbox there is a single guest to put the grid in, so every pane starts inside it and an
+agent is just `claude`. Nothing per pane crosses the boundary, and there is no way to start an agent
+on the Mac by accident from a pane. The grid lives and dies with the sandbox, which also holds every
+agent, so nothing extra is lost when it stops.
+
+### Open internet
+
+The goal is protecting the Mac, not controlling where data goes, and agents that cannot read current
+documentation write confidently outdated code. A deny-by-default allowlist cannot cover the long tail
+of documentation without stopping being a firewall. So the preset is `allow-all`, and the
+consequence is stated: anything in the sandbox, including every project's source, can be sent
+anywhere. That is why nothing that would hurt to leak belongs in it.
+
+### Agents push their own branches
+
+This cookbook used to forbid any credential that could push to a real repo inside a sandbox, because
+a token there could be read and stolen. Injection removed that: the token is never in the sandbox. What
+is left is use — while an agent runs it can push any branch and open any PR the token allows. Two
+GitHub settings bound that: a fine-grained token limited to the repos agents work on, and a ruleset
+that keeps everything off `main` without a pull request. In return nobody has to fetch work out of a
+sandbox and push it by hand, and review happens where it already happens, on GitHub.
+
+## The host and the network
 
 A single Mac that does two unrelated jobs at once, without letting the second endanger the first:
 
@@ -17,26 +96,17 @@ A single Mac that does two unrelated jobs at once, without letting the second en
    or a bad dependency could turn an agent into an attacker.
 
 The shape that satisfies both: a trusted host user owns the native apps and Tailscale, and agents run
-in microVMs that own nothing. The microVM is the security boundary.
+in a microVM that owns nothing. The microVM is the security boundary.
 
-Two priorities shape the rest, and they are worth stating because they rule things out. The pivot
-this design cares about most is the tailnet: the server is itself a node, so anything that gets
-network reach on it would otherwise inherit a path to your laptop and everything else you own. And
-running on a Claude subscription rather than an API key is a first-class requirement, not a
-preference — a setup that is annoying to sign in to is one you stop using, and the friction would be
-paid on every project forever.
+The tailnet is closed independently of the sandbox. The tailnet policy names no rule with `tag:host`
+as a source, so the server cannot open a connection to any device you own — from the sandbox, from
+the host, even as root, even if every other control here has failed. Tailscale enforces ACLs on the
+receiving device, so it is the one protection in this design the server does not administer: a fully
+compromised host cannot switch it off. Traffic goes one way: you reach the server, the server reaches
+nothing of yours.
 
-The tailnet pivot is closed twice over, deliberately, because the two mechanisms fail for unrelated
-reasons. Sandbox egress blocks private ranges, so agent code cannot reach the tailnet from inside.
-And the tailnet policy names no rule with `tag:host` as a source, so the server cannot open a
-connection to any device you own even from the host, even as root, even if every other control here
-has failed. Traffic goes one way: you reach the server, the server reaches nothing.
-
-The second one is the stronger control and it is worth being clear why. Tailscale enforces ACLs on
-the receiving device, so it is the only protection in this design that the server does not
-administer — a fully compromised host cannot switch it off. It also covers the host itself, which is
-exactly where the sandbox contributes nothing, and it bounds what someone gets by walking off with a
-machine that runs FileVault off and auto-login on.
+Running on a Claude subscription rather than an API key is a requirement, not a preference — a setup
+that is annoying to sign in to is one you stop using.
 
 ## Architecture
 
@@ -57,13 +127,13 @@ Mac (<server>) — macOS, FileVault off, auto-login
 │   │     (GUI app, relaunched by a LaunchAgent — up once this
 │   │      session logs in; SSH and Screen Sharing are system-level)
 │   │
-│   ├─ tmux grid — one pane per project, survives you detaching
+│   ├─ `agents` — attaches you to the grid inside the sandbox
 │   │
-│   └─ sbx (Docker Sandboxes)
-│        └─ one long-lived microVM per project
-│             • own filesystem, own Docker daemon, own network
-│             • all egress through a host-side proxy under policy
-│             • --clone: read-only view of the repo, work fetched back out
+│   └─ sbx (Docker Sandboxes) — holds the Claude, Codex and GitHub tokens
+│        └─ one long-lived microVM, "agents", nothing from the Mac mounted
+│             • tmux grid, one pane per project
+│             • ~/<project> clones, pushed to GitHub as branches
+│             • all egress through a host-side proxy, which injects the tokens
 ```
 
 ## Components
@@ -119,27 +189,23 @@ login cannot assume the tailnet, which is the constraint that shapes the key ser
 
 ### The agent sandbox
 
-Agents run in microVMs managed by `sbx`, never on macOS directly. That boundary is what makes "skip
+Agents run in one microVM managed by `sbx`, never on macOS directly. That boundary is what makes "skip
 all permission prompts" acceptable, because it gives something the host side cannot:
 
-- A separate kernel and filesystem, so an agent cannot read the host's files, Keychain or credentials.
-- A network it does not control: all egress goes through a proxy on the host that enforces a
-  deny-by-default policy, and non-HTTP protocols are blocked outright. The host, localhost services
-  and private ranges are unreachable — including the tailnet and the LAN the server sits on. The
-  tailnet policy blocks the same pivot independently, so this is the inner of two layers rather than
-  the only one; the LAN is where it is the only one.
-- Disposability. Worst case you delete the sandbox; the host is untouched.
+- A separate kernel and filesystem with nothing from the Mac mounted, so an agent cannot read or
+  write the host's files, Keychain or credentials.
+- Sign-ins that are used without being held. The Claude, Codex and GitHub tokens stay on the Mac and
+  the proxy adds them to outbound requests; inside the sandbox there is nothing to steal.
+- A network the agent does not control: all egress goes through that proxy. Under `allow-all` it
+  reaches the internet freely. `allow-all` alone would also reach the Mac's own services and
+  private ranges, so explicit deny rules close those — see
+  [`have-agent-sandbox`](../recipes/have-agent-sandbox/recipe.md).
+- Disposability. Worst case you delete the sandbox; the host is untouched, and the work that matters
+  is already on GitHub as branches.
 
-This replaced a hand-built Colima VM, an nftables ruleset and a container launcher. Not because those
-could not work, but because they were security-critical code with nobody but us reviewing them, and
-three real defects surfaced in a single pass — a firewall that filtered only locally-originated
-traffic so every container bypassed it, a verify that tested the wrong network namespace and
-therefore always passed, and a container tier that could not authenticate. A maintained tool with a
-stricter default posture is the better trade.
-
-The cost, stated rather than buried: the agent layer now depends on a proprietary tool and a Docker
-account, free at time of writing. The host layer deliberately does not, so the machine stays useful
-if that changes.
+[`have-agent-sandbox`](../recipes/have-agent-sandbox/recipe.md) installs and configures `sbx`;
+[`have-shared-sandbox`](../recipes/have-shared-sandbox/recipe.md) creates the one sandbox;
+[`join-github`](../recipes/join-github/recipe.md) stores the token agents push with.
 
 ### Which `~/.claude` is which
 
@@ -148,39 +214,36 @@ Two of them, and "where is my sign-in" has two answers.
 | Where | Path | Signed in |
 |---|---|---|
 | Host Mac | the admin user's `~/.claude` | for cookbook work only |
-| Sandbox | inside the microVM | `/login`, once, from any sandbox |
+| Sandbox | inside the microVM | `/login`, once |
 
-The host one is the session you run `/setup` from and it never touches the other. That is not just
-isolation, it is literal: sandboxes inherit nothing from the host's `~/.claude`, and they share no
-home directory with each other either.
+The host one is the session you run `/setup` from and it never touches the other. The sandbox
+inherits nothing from the host's `~/.claude`, and nothing of the host's is mounted into it — which is
+also what keeps an agent from planting a hook the host session would run.
 
-The sign-in is the exception, and it goes the other way from what you would expect. `/login` is typed
-inside a sandbox, but the resulting session token is stored on the host and injected into outbound
-requests by the proxy — it is never written inside the sandbox at all. So the agent can make
-authenticated calls and cannot read, log or exfiltrate the credential, and every later sandbox is
-authenticated without signing in again.
+The sign-in goes the other way from what you would expect. `/login` is typed inside the sandbox, but
+the resulting session token is stored on the host and injected into outbound requests by the proxy —
+it is never written inside the sandbox at all. So the agent can make authenticated calls and cannot
+read, log or exfiltrate the credential, and recreating the sandbox does not cost you the login.
 
 That is what makes the subscription the recommended path rather than an API key. It is less work and
 less exposure at the same time, which is rare enough to say plainly.
 
-It is also why per-sandbox defaults come from a kit rather than a dotfile: a committed `spec.yaml`
+It is also why the sandbox's defaults come from a kit rather than a dotfile: a committed `spec.yaml`
 travels with the repo, where a host-side config would not reach the sandbox at all.
 
-## Trust boundaries, in order
+## Trust boundaries
 
-1. Host vs sandbox (the hypervisor): protects the native apps, host files, Keychain and host
-   localhost services from the agents. This is the load-bearing boundary, and the only one this
-   design would pay anything to keep.
-2. Sandbox vs sandbox: each project gets its own microVM and network, so an untrusted project cannot
-   reach another project's files or listening ports. Direct network communication between sandboxes
-   is blocked and cannot be re-enabled by policy.
+1. Host vs sandbox (the hypervisor): protects the native apps, host files, Keychain, host localhost
+   services and the host's own Claude Code session from the agents. This is the load-bearing
+   boundary, and the only one this design pays anything to keep.
+2. The tailnet policy: the server, host or sandbox, cannot open a connection to any device you own.
+   Enforced by Tailscale on the receiving end, independently of anything on this machine.
+3. GitHub's own settings: a token limited to some repos and a ruleset on `main` bound what an agent
+   can do with the push access it is given.
 
-The second one is not a goal here, it is a byproduct, and the distinction matters for what you should
-do when it gets in the way. Projects on this machine belong to one person at one trust level, so
-separating them was never the point. It is worth keeping only because it costs nothing: the sign-in
-is held on the host, so ten sandboxes are no more setup than one. If sharing ever turns out to be
-simpler for some piece of work, mounting several directories into one sandbox is supported and is the
-right answer — the boundary worth defending is the first one.
+What is deliberately not a boundary: one project from another. They share the sandbox, its network
+policy and its home directory. If one project ever needs to be kept from the rest, a second sandbox
+created the same way is one command, and the sign-ins are already on the host.
 
 ## Startup and restart
 
@@ -190,11 +253,11 @@ A reboot has to bring everything back unattended, in one sequence:
 2. The host session starts the native apps and Tailscale connects, re-advertising the exit node.
 3. That is all that needs to happen automatically.
 
-Agent sandboxes are deliberately not restarted. They persist as objects, but bringing them up
-automatically would mean auto-starting agent runs. The posture is to bring the machine back
-unattended but launch agent work by hand. What has to survive a reboot is the machine and the work —
-and the work survives because it is pushed or fetched out of a sandbox, not because the sandbox
-persists. See [`pushing-agent-code.md`](pushing-agent-code.md).
+The agent sandbox is deliberately not restarted. It persists as an object, with every checkout in
+it, but bringing it up automatically would mean auto-starting agent runs. The posture is to bring the
+machine back unattended but launch agent work by hand: the first `agents` after a reboot starts the
+sandbox and creates a fresh grid. What has to survive a reboot is the machine and the work — and the
+work survives because it is pushed to GitHub, not because the sandbox persists.
 
 The one planned exception is `make-data-encrypted`, whose unlock has to run before the session
 exists. That is why it is a LaunchDaemon and why its key fetch is held to needing nothing but DHCP,
@@ -210,7 +273,7 @@ skipped, so the list is deliberately short and each entry has to beat the simple
 | Homebrew | official installer, `Homebrew/install` | The only sane way to get the rest on macOS |
 | Tailscale | Homebrew cask, upstream signed app | The cask is what survives a reboot cleanly |
 | Docker Sandboxes | Homebrew tap, Docker Inc | Proprietary, but a maintained boundary beats a hand-written one |
-| tmux | Homebrew | A multiplexer is the smallest thing that outlives an SSH connection |
+| tmux | apt, inside the sandbox, from the kit | A multiplexer is the smallest thing that outlives an SSH connection |
 
 Nothing is pinned by digest. Tracking current versions means updates arrive, which matters more on a
 long-lived server than byte-identical rebuilds — the reproducibility that is load-bearing here is the
@@ -222,15 +285,15 @@ researches the questions it cannot answer from the machine.
 The day-to-day layer: how one person coordinates many in-flight projects without hand-attaching a
 terminal to each one.
 
-The decision, and it is not a placeholder: a persistent tmux grid on the server, one pane per
-project. SSH in over Tailscale and attach to that one session; each pane runs
-`sbx run --clone <agent>`, which attaches you to the agent directly, so a pane is a session and
+The decision, and it is not a placeholder: a persistent tmux grid inside the agent sandbox, one pane
+per project. `ssh <server> -t agents` attaches to it from anywhere on the tailnet; every pane is
+already inside the sandbox, so starting an agent is `claude` or `codex` in a project's clone, and
 there is nothing to connect to per project. From the phone it is the same command from an SSH client.
 
 The agents' own remote-control features sit beside this rather than replacing it, and for the same
 reason in both cases: each drives one session, where the grid surveys every project. Claude Code's is
-no longer ruled out — sbx v0.39.0 added a `claude.remoteControl` setting that lets
-`/remote-control` reach an agent in a sandbox, though its inbound half is still unreliable. Codex
+not ruled out — sbx v0.39.0 added a `claude.remoteControl` setting for it — but it does not work on
+current stable: it regressed in v0.43, and the fix lands in v0.48.0. Codex
 Remote never had the proxy problem and has a worse one: it is set up from the ChatGPT desktop app,
 which a headless server cannot present, and it drives Codex on the host rather than in a sandbox. Its
 SSH-host mode is the one that matches this design, and it is untried.
@@ -244,8 +307,10 @@ the model is doing. Adopt a worktree board only when reading diffs across many t
 that hurts. Not before.
 
 Why tmux specifically, since this category churns fast and the question keeps coming back. The
-alternatives were compared against three requirements this machine actually has, and all but one
-fail one structurally rather than narrowly:
+alternatives were compared against three requirements this machine actually has. The table was drawn
+up when the grid ran on the Mac and each pane launched its own `--clone` sandbox; the last column is
+what that shape demanded, and the notes below say what changed when the grid moved inside one
+sandbox.
 
 | | Survives disconnect | Headless server | Works with `--clone` |
 |---|---|---|---|
@@ -261,13 +326,13 @@ keep tmux if sessions must survive an SSH disconnect, and this server has no GUI
 into. Zellij is a genuine peer — persistent, SSH-capable, better ergonomics — but has open scrollback
 defects with agent TUIs over SSH, including the Termux path, and this repo's scope covers Codex as
 well as Claude Code. The agent managers isolate work with a git worktree per agent, and `sbx` rejects
-`--clone` from anywhere but the main checkout, so their isolation mechanism and ours cannot both run;
-theirs is also the weaker one, since a worktree is not a microVM. The desktop review apps assume a
-machine you look at.
+`--clone` from anywhere but the main checkout, so with per-project sandboxes their isolation mechanism
+and ours could not both run. With the repos cloned inside one sandbox that conflict is gone — a
+worktree manager could run inside the sandbox like tmux does — so what rules them out now is only the
+review-bottleneck argument above. The desktop review apps still assume a machine you look at.
 
-So tmux stays, and for everything above it stays for a reason that will not move: the requirement
-doing the eliminating is headless-plus-SSH-plus-sbx-owns-isolation, which is the shape of this design
-rather than a taste. herdr is the exception, and gets its own section.
+So tmux stays, for reasons that will not move for anything above except herdr, which gets its own
+section. Moving inside the sandbox did not change the choice of tmux, only where it runs.
 
 ### herdr, the one that passes on paper
 
@@ -281,26 +346,27 @@ required, so `sbx run --clone` from the main checkout works.
 
 What it adds is the thing tmux does not have: each pane carries a state — blocked, working, done,
 idle — rolled up into a sidebar, a picker that jumps to whatever is blocked, and notifications that
-work over SSH. On a grid of sandboxes that is the difference between scanning every pane and being
+work over SSH. On a grid of agents that is the difference between scanning every pane and being
 told which one wants you. Its docs also cover phones directly: plain SSH, and a TUI that adapts to
 narrow screens.
 
-Three things about how that works here, because the sandbox changes them:
+How that works here depends on where herdr runs, and the grid moving inside the sandbox changed the
+answer:
 
-- It detects an agent from the pane's foreground process, and under `sbx` that process is `sbx`,
-  not `claude`. The documented fix is a hint on the host-side command, not inside the sandbox —
-  `HERDR_AGENT=claude sbx run --clone --name <project> claude` — and the maintainers closed a
-  request to look inside sandboxes as working as designed
-  ([herdr#2181](https://github.com/herdrdev/herdr/issues/2181)). Without the hint you get a plain
-  multiplexer with a sidebar of unknowns. With it, state comes from reading the screen against a
-  detection manifest, which is heuristic: an unrecognised prompt reads as idle, not blocked.
-- Its Claude Code and Codex integration hooks install into `~/.claude` and `~/.codex` on the host and
-  cannot reach an agent in a microVM. That is fine, and one consequence is worth closing off rather
-  than relying on: native session restore relaunches an agent with its own resume command, and on
-  this machine that would run on the host, outside the sandbox. Set
-  `[session] resume_agents_on_restore = false` in `~/.config/herdr/config.toml` so it cannot.
-- It fetches detection-manifest updates from herdr.dev, which is outbound traffic from the host.
-  `[update] manifest_check = false` turns it off; either way, decide rather than discover it.
+- On the Mac, it detects an agent from the pane's foreground process, and under `sbx` that process
+  is `sbx`, not `claude`. The documented fix is a hint on the host-side command —
+  `HERDR_AGENT=claude sbx run --clone --name <project> claude` — and the maintainers closed a request
+  to look inside sandboxes as working as designed
+  ([herdr#2181](https://github.com/herdrdev/herdr/issues/2181)).
+- Inside the sandbox, where tmux now runs, herdr would see `claude` and `codex` as ordinary
+  processes, so detection needs no hint, and its integration hooks would install into the sandbox's
+  `~/.claude` and `~/.codex` rather than the Mac's. Nobody has tried it there. Its detection is
+  screen-reading either way, which is heuristic: an unrecognised prompt reads as idle, not blocked.
+- Session restore relaunches an agent with its own resume command. On the Mac that would run outside
+  the sandbox, so set `[session] resume_agents_on_restore = false` in `~/.config/herdr/config.toml`
+  there. Inside the sandbox it is harmless.
+- It fetches detection-manifest updates from herdr.dev. `[update] manifest_check = false` turns it
+  off; either way, decide rather than discover it.
 
 Why it is not the default yet. Survival is the requirement the whole grid exists for, and here it is
 documented but unproven on this exact shape: an open bug,
@@ -322,11 +388,13 @@ The options, then:
   `tmux` as the pane process and loses detection.
 - tmux only. What `have-coordination` installs today, and nothing above makes it wrong.
 
-The test that decides it, on a real server: SSH in, run `herdr`, start
-`HERDR_AGENT=claude sbx run --clone --name <project> claude` in a pane, drop the SSH connection
-without detaching, reconnect, and confirm the agent is still running and its state is right. Then
-repeat from a phone with Codex, since scrollback over SSH is what ruled out Zellij. If that passes,
-swapping tmux for herdr in `have-coordination` is the next change, with the config above pinned.
+The test that decides it, on a real server, now inside the sandbox: install herdr there, start it
+from `sbx exec -it agents bash`, run `claude` in a pane, drop the SSH connection without detaching,
+reconnect, and confirm the agent is still running and its state is right. Then repeat from a phone
+with Codex, since scrollback over SSH is what ruled out Zellij. If that passes, swapping tmux for
+herdr in `have-coordination` is the next change, with the config above pinned. The macOS server
+lifetime bug above does not apply inside a Linux sandbox; whether herdr's server survives the
+`sbx exec` session ending is the same open question tmux has.
 
 Deliberately absent: a dispatcher that takes a request from a chat app and routes it to an agent
 unattended. That is the natural next thing to want, and it is the point at which this stops being a
@@ -345,38 +413,44 @@ network-exposed daemon, and the design should be revisited rather than extended.
 - [Remote Control inside sandboxes](https://github.com/docker/sbx-releases/issues/8) — why `/rc` did
   not reach a sandboxed agent, and
   [sbx v0.39.0](https://github.com/docker/sbx-releases/releases/tag/v0.39.0), which added the
-  setting that lets it
+  setting that lets it; [#664](https://github.com/docker/sbx-releases/issues/664) for the v0.43
+  regression, fixed for v0.48.0
+- [Docker Sandboxes release notes](https://docs.docker.com/ai/sandboxes/release-notes/) — the design
+  was last checked against v0.47.0
 - [Codex Remote connections](https://developers.openai.com/codex/remote-connections) — the desktop
   app requirement, and the SSH-host mode that is the only one shaped like this machine
 
 ## What is left to pin
 
-Settled: the naming scheme, the host layer, the network posture (sbx's policy rather than ours), and
-the coordination layer.
+Settled: the goals at the top, the naming scheme, the host layer, one shared sandbox with the grid
+inside it, `allow-all`, and agents pushing their own branches.
 
-Genuinely open:
+Open only because the answers are not published anywhere, and each is a few commands on the first
+real server. Every one is also written into the recipe it affects:
 
-- How much the `balanced` allowlist has to grow in practice. It covers AI provider APIs, package
-  managers, code hosts and registries — the agent works and dependencies install — but not
-  documentation sites, so research is denied by default. Whether that settles into a handful of
-  added domains, a doc broker, or a wider policy for research sandboxes is a first-run finding. See
-  "Research versus containment" in [`secrets-and-egress.md`](secrets-and-egress.md).
-
-Three smaller questions are open only because the answers are not published anywhere, rather than
-because the design is undecided. Each is one command on a real server:
-
-- Whether a second sandbox re-prompts for `/login` or picks the host-held credential up silently.
-  Everything about the design says silently. Docker does not say so outright in the get-started
-  guide, the credentials page, the Claude Code or Droid agent pages, the FAQ, or the release notes.
+- Whether an agent started from a shell — `sbx exec`, then `claude` — gets the injected sign-in the
+  way one started with `sbx run` does. The proxy injects per sandbox, which says yes; Docker documents
+  `exec` for shells and commands, not for a second agent. The whole grid depends on it. If it fails,
+  the fallback is still one sandbox: Claude Code's agents view,
+  `sbx run --name agents -- --dangerously-skip-permissions agents`, runs several sessions from one
+  `sbx run`. See [`have-shared-sandbox`](../recipes/have-shared-sandbox/recipe.md).
+- Whether the grid survives the `agents` connection ending. tmux forks its server away from the
+  client, but whether `sbx exec` reaps what it started is not documented. See
+  [`have-coordination`](../recipes/have-coordination/recipe.md).
+- Whether the deny rules that keep sandboxes off the Mac hold — `allow-all` does not do it alone,
+  so `have-agent-sandbox` denies `localhost`, `host.docker.internal` and the private ranges, and its
+  verify tries the Mac's SSH from inside a sandbox. See
+  [`have-agent-sandbox`](../recipes/have-agent-sandbox/recipe.md).
+- Whether the injected GitHub token reaches `git push` over HTTPS and not only `gh`. Docker lists
+  `github.com` among its hosts, which says yes. See [`join-github`](../recipes/join-github/recipe.md).
+- Whether Codex works in the one sandbox. It is created as `claude`, so the kit installs Codex and
+  declares its sign-in, copied from Docker's codex kit; none of that has run yet. See
+  [`have-shared-sandbox`](../recipes/have-shared-sandbox/recipe.md).
 - Whether turning on `claude.remoteControl` costs the credential masking. A stock sandbox holds a
   sentinel in `~/.claude/.credentials.json` while the real token stays on the host, and the
   community workaround for this same problem bought Remote Control by bypassing the intercept, which
-  put the real token in the sandbox. Docker's own fix may well not, but neither the release note nor
-  the Claude Code agent page says. One `cat` inside a sandbox with the setting on.
-- Whether `sbx policy init <preset>` succeeds on a fresh install with no policy to replace. It is
-  documented as the non-interactive way to set a preset, and `have-agent-sandbox` treats a failure as
-  fatal rather than a warning, because an unset policy means the first `sbx run` prompts and a prompt
-  on a headless server hangs.
+  put the real token in the sandbox. One `cat` inside the sandbox with the setting on, once v0.48.0
+  makes the setting work again.
 
 Deferred by scope, with a recipe carrying its `blocked_by`: `make-data-encrypted` needs a real server
 to build against, and `have-native-apps` is server-specific by nature.
