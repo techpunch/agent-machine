@@ -80,6 +80,7 @@ finished step is a no-op.
 | Keep running unattended | Never sleeps, comes back by itself after a power cut |
 | Run with no monitor or keyboard | Proves reboot survival first, then you unplug |
 | Route your traffic through it | Use it as a Tailscale exit node on untrusted wifi |
+| Log in with keys, not passwords | SSH stops taking the admin password; Screen Sharing still does |
 | Run coding agents on it | WIP - Claude Code and Codex in one sandbox, pushing branches to GitHub |
 | Drive many projects at once | WIP - A persistent terminal grid inside the sandbox, from anywhere |
 | Stop running what nobody uses | Spotlight, screen saver and desktop widgets off, so agents get the CPU |

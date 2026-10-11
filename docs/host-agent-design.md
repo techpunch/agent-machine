@@ -124,6 +124,7 @@ Mac (<server>) — macOS, FileVault off, auto-login
 │   ├─ Tailscale — the server's only node, "<server>"
 │   │     • exit node: route your phone/laptop traffic through the server
 │   │     • remote login: SSH + Screen Sharing over the tailnet
+│   │       (SSH keys only, optionally; Screen Sharing keeps the password)
 │   │     (GUI app, relaunched by a LaunchAgent — up once this
 │   │      session logs in; SSH and Screen Sharing are system-level)
 │   │

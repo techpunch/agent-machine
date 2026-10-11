@@ -1,7 +1,7 @@
 ---
 name: drive-many-projects
 summary: Drive many projects at once
-order: 7
+order: 8
 recipes: [have-coordination]
 ---
 
