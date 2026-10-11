@@ -21,9 +21,9 @@ git clone https://github.com/<you>/<project> ~/<project>  # in a pane, once per 
 cd ~/<project> && claude                                  # or codex — bypass mode either way
 ```
 
-Every pane is already inside the sandbox, so an agent is just `claude` or `codex`. They start in
-bypass mode because the kit aliases them that way —
-a session started from a shell does not get the defaults `sbx run` would add. Typing `claude` on the
+Every pane is already inside the sandbox, so an agent is just `claude` or `codex`, and both start in
+bypass mode from their config files — see
+[`have-agent-sandbox`](../have-agent-sandbox/recipe.md#codex-as-well-as-claude-code). Typing `claude` on the
 Mac itself is the one thing not to do: that runs on macOS, outside the sandbox, with everything the
 sandbox exists to protect.
 

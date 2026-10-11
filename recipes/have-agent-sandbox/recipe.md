@@ -95,9 +95,11 @@ Both run in the same sandbox. Three differences worth knowing:
   an SSH tunnel — see [`../../prereqs/openai-account.md`](../../prereqs/openai-account.md). Claude Code's `/login` is
   typed inside the sandbox and reaches the host from there. Both end the same way: tokens in the host
   keychain, injected by the proxy, never written inside a sandbox.
-- Bypass mode is a flag you type, or an alias. `sbx run codex` adds
-  `--dangerously-bypass-approvals-and-sandbox` for you, but agents here are started from a shell in a
-  tmux pane, which adds nothing — so the kit aliases `codex` and `claude` to include their flags.
+- Bypass mode is configuration, not a flag. Agents here are started from a shell in a tmux pane
+  rather than by `sbx run`, and still start in bypass mode, because it lives in their config files:
+  Docker's claude kit seeds `permissions.defaultMode: bypassPermissions` into
+  `~/.claude/settings.json`, and the Codex config the kit copies sets `approval_policy = "never"` and
+  `sandbox_mode = "danger-full-access"`.
 - `~/.codex` does not follow it in, exactly as `~/.claude` does not.
 
 There is one sandbox and every agent runs in it, but `sbx create` still takes an agent name. The name
@@ -120,8 +122,7 @@ carries:
 - Codex: installed with the line from Docker's codex Dockerfile, its OpenAI sign-in declared with the
   `credentials` block from Docker's codex kit, and its config seeded the way that kit seeds it. The
   OAuth block is what keeps the real token on the Mac — the sandbox only ever sees sentinels.
-- tmux and its config (`kit/files/home/.tmux.conf`) for the grid, and `claude` and `codex` aliased
-  to start in bypass mode from a shell.
+- tmux and its config (`kit/files/home/.tmux.conf`) for the grid.
 - An update at every sandbox start, in the background: `claude update`, and Codex's installer run
   again — which is what `codex update` does, called directly so the flags are explicit. The image
   was current only on the day it was pulled, and the sandbox lives for months.

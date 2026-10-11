@@ -20,9 +20,7 @@ What apply does:
   with it.
 - Loads the kit from [`../have-agent-sandbox/kit/`](../have-agent-sandbox/kit/), which installs Codex
   and tmux beside Claude Code, updates both agents at every sandbox start, and tells every agent how
-  to work here. It also aliases `claude` and `codex` to start in bypass mode: `sbx run` does that by
-  default, but a session started from a shell does not, and here every agent is started from a shell
-  in a tmux pane. Everything inside the sandbox comes from the kit, so recreating the sandbox
+  to work here. Everything inside the sandbox comes from the kit, so recreating the sandbox
   recreates all of it.
 - Before creating the sandbox, gates until the Codex sign-in is stored (`CODEX=off` skips it), and
   writes the binding that lets sbx hand that sign-in to our kit. The kit sets Codex up from whether a

@@ -17,7 +17,7 @@ fi
 [ -n "${SBX_SANDBOX:-}" ] && ok "sandbox name recorded in server.env" \
   || miss "SBX_SANDBOX not recorded in server.env — run apply"
 
-# What is inside — tmux, Codex, the bypass-mode aliases — comes from the kit at create, and detached
+# What is inside — tmux, Codex, the agents' guidance — comes from the kit at create, and detached
 # mode from apply. Reading any of it means `sbx exec`, which starts a stopped sandbox, and a verify
 # must not change the machine, so none of it is re-read here.
 

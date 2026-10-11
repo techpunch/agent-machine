@@ -78,24 +78,19 @@ environment:
 
 setup:
   install:
-    # tmux for the agent grid — its config is files/home/.tmux.conf beside this file — and the
-    # aliases that put bypass mode back. `sbx run` starts an agent in bypass mode; a session started
-    # from a shell does not, and here every agent is started from a shell in a tmux pane. Docker's
-    # kit docs name /etc/sandbox-persistent.sh, appended in an install command, as the place for
-    # shell initialization; every Bash in the sandbox sources it.
+    # tmux for the agent grid; its config is files/home/.tmux.conf beside this file. Nothing is
+    # needed for bypass mode in a pane: Docker's claude kit seeds permissions.defaultMode
+    # bypassPermissions into ~/.claude/settings.json, and the Codex config below sets
+    # approval_policy "never" and sandbox_mode "danger-full-access", so a plain `claude` or `codex`
+    # starts that way however it was launched.
     - command: |
         set -e
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -q
         apt-get install -y -q --no-install-recommends tmux
         rm -rf /var/lib/apt/lists/*
-        # Install commands run again when a sandbox is recreated over its old filesystem, so append once.
-        grep -qF 'alias claude=' /etc/sandbox-persistent.sh 2>/dev/null || cat >> /etc/sandbox-persistent.sh << 'EOF'
-        alias claude='claude --dangerously-skip-permissions'
-        alias codex='codex --dangerously-bypass-approvals-and-sandbox'
-        EOF
       user: "0"
-      description: Install tmux, and start claude and codex in bypass mode from a shell
+      description: Install tmux
     # The install line from Docker's codex Dockerfile. It installs the current release into
     # ~/.local/bin, where Claude Code's installer also puts `claude`, and links it onto the PATH the
     # image uses for agents, as that Dockerfile does.
