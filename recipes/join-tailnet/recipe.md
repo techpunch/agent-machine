@@ -38,7 +38,7 @@ is the machine.
 
 The `tag:host` tag, its owner, and the reusable key are shared setup done once — see
 `docs/shared-setup.md`. The host is the only tailnet node on the server: agent sandboxes cannot
-reach the tailnet at all, since their egress policy blocks private ranges outright.
+reach the tailnet, because `have-agent-sandbox` denies them its `100.64.0.0/10` range.
 
 ## The tag is a boundary, not a label
 

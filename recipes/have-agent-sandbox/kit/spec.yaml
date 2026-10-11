@@ -1,51 +1,219 @@
-# Managed by the agent-machine cookbook. Applied with `sbx run --kit <path> ...`.
+# Managed by the agent-machine cookbook. have-shared-sandbox applies it with `sbx create --kit <path>`
+# on top of the built-in claude agent.
 #
-# A kit is the supported way to give every sandbox the same defaults, and it is a committed file,
-# which is what this repo wants: the allowlist and the agent guidance are reviewable and travel with
-# the recipe rather than living in one machine's local policy store.
-schemaVersion: "1"
+# A kit is the supported way to give a sandbox the same defaults every time, and it is a committed
+# file, which is what this repo wants: what the agents are told, what is installed beside Claude
+# Code and the Codex sign-in are reviewable here rather than living in one machine's local state.
+#
+# Schema v2, because v1 cannot declare a credential the way Docker's own agent kits do. The Codex
+# parts are copied from Docker's codex kit, docker/sbx-kits-contrib codex/spec.yaml and
+# codex/Dockerfile; when that kit changes, compare against it rather than reasoning from scratch.
+schemaVersion: "2"
 kind: mixin
 name: agent-machine
 displayName: agent-machine defaults
-description: Denial-reporting guidance and a starter documentation allowlist.
+description: Codex beside Claude Code, both kept current, and how to work in this sandbox.
+requires:
+  agent: claude
 
-network:
-  # `balanced` already covers AI provider APIs, package managers, code hosts and registries. These
-  # are the documentation hosts it does not, and without them an agent works from memory.
-  #
-  # Curate this. Documentation and package hosts earn a place; telemetry and analytics do not. If a
-  # single task needs a dozen more, scope them to that sandbox with
-  # `sbx policy allow network <domain> --sandbox <name>` rather than widening the baseline here.
-  allowedDomains:
-    - developer.mozilla.org
-    - docs.python.org
-    - "*.readthedocs.io"
-    - pkg.go.dev
-    - docs.rs
-    - developer.apple.com
-    - man7.org
+# The Codex sign-in, verbatim from Docker's codex kit. The OAuth block is what keeps the real token
+# on the Mac: the proxy intercepts the token response from auth.openai.com, hands the sandbox the
+# sentinels below, and swaps the real token back in on requests to chatgpt.com. Never add
+# `passthrough: true` — it sends the real token into the sandbox.
+#
+# A kit that is not built into sbx needs an approved binding before sbx will use this, and with
+# nobody at the screen sbx withholds the credential silently instead of asking. have-shared-sandbox
+# writes that binding before it creates the sandbox.
+credentials:
+  - service: openai
+    apiKey:
+      name: OPENAI_API_KEY
+      inject:
+        - domain: api.openai.com
+          header: Authorization
+          format: Bearer %s
+        - domain: openai.com
+          header: Authorization
+          format: Bearer %s
+    oauth:
+      tokenEndpoint:
+        host: auth.openai.com
+        path: /oauth/token
+      resourceHosts:
+        - chatgpt.com
+      sentinels:
+        accessToken: oai-oat01-proxy-managed
+        refreshToken: oai-ort01-proxy-managed
 
-# Appended to the agent's memory. Kits cannot write ~/.claude/CLAUDE.md directly — sandboxes seed
-# that path during setup and would overwrite it — so agentContext is the supported route.
-agentContext: |
-  ## Say when the network blocked you
+permissions:
+  network:
+    # Every domain a credential is injected into has to be allowed here, whatever the preset. The
+    # Codex hosts are the codex kit's list. The documentation hosts only matter under a preset
+    # stricter than allow-all — `balanced` covers AI APIs, package managers, code hosts and
+    # registries, and these are the docs it does not. Curate them: documentation and package hosts
+    # earn a place, telemetry and analytics do not.
+    allow:
+      - api.openai.com
+      - openai.com
+      - auth.openai.com
+      - chatgpt.com
+      - files.openai.com
+      - "*.chatgpt.com"
+      - "*.oaiusercontent.com"
+      - releases.openai.com
+      - developer.mozilla.org
+      - docs.python.org
+      - "*.readthedocs.io"
+      - pkg.go.dev
+      - docs.rs
+      - developer.apple.com
+      - man7.org
 
-  This sandbox has deny-by-default network egress. A request that fails with `403` and
-  `Blocked by network policy` was refused by this machine's policy, not by the site.
+environment:
+  variables:
+    CODEX_HOME: /home/agent/.codex
 
-  When that happens:
+setup:
+  install:
+    # tmux for the agent grid — its config is files/home/.tmux.conf beside this file — and the
+    # aliases that put bypass mode back. `sbx run` starts an agent in bypass mode; a session started
+    # from a shell does not, and here every agent is started from a shell in a tmux pane. Docker's
+    # kit docs name /etc/sandbox-persistent.sh, appended in an install command, as the place for
+    # shell initialization; every Bash in the sandbox sources it.
+    - command: |
+        set -e
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -q
+        apt-get install -y -q --no-install-recommends tmux
+        rm -rf /var/lib/apt/lists/*
+        cat >> /etc/sandbox-persistent.sh << 'EOF'
+        alias claude='claude --dangerously-skip-permissions'
+        alias codex='codex --dangerously-bypass-approvals-and-sandbox'
+        EOF
+      user: "0"
+      description: Install tmux, and start claude and codex in bypass mode from a shell
+    # The install line from Docker's codex Dockerfile. It installs the current release into
+    # ~/.local/bin, where Claude Code's installer also puts `claude`, and links it onto the PATH the
+    # image uses for agents, as that Dockerfile does.
+    - command: |
+        set -e
+        mkdir -p /home/agent/.codex
+        CODEX_INSTALL_DIR=/home/agent/.local/bin CODEX_NON_INTERACTIVE=true \
+          sh -c "$(curl -fsSL https://chatgpt.com/codex/install.sh)"
+        /home/agent/.local/bin/codex --version
+        mkdir -p /usr/local/share/npm-global/bin
+        ln -sf /home/agent/.local/bin/codex /usr/local/share/npm-global/bin/codex
+      user: "1000"
+      description: Install the Codex CLI
+    # Verbatim from Docker's codex kit, which seeds Codex's config from how the openai credential
+    # resolved: under OAuth, Codex talks to chatgpt.com through the proxy with the sentinel.
+    - command: |
+        set -e
+        mkdir -p /home/agent/.codex /home/agent/.agents
+        MODE="${SBX_CRED_OPENAI_MODE:-none}"
+        cat > /home/agent/.codex/config.toml << 'EOF'
 
-  - Stop and say so. Name the exact domain from the error and what you wanted from it.
-  - Do not answer from memory instead, and do not quietly try a different source.
+        approval_policy = "never"
+        sandbox_mode = "danger-full-access"
+        mcp_oauth_credentials_store = "file"
+        EOF
+        case "$MODE" in
+          oauth|apikey)
+            cat >> /home/agent/.codex/config.toml << 'EOF'
+        forced_login_method = "api"
+        EOF
+            ;;
+        esac
+        if [ "$MODE" = oauth ]; then
+          cat >> /home/agent/.codex/config.toml << 'EOF'
 
-  An answer built on recalled documentation looks confident and is often wrong about current APIs.
-  Telling me you could not reach the docs is the better outcome every time, because it costs me one
-  command to fix:
+        model_provider = "sandboxd"
 
-      sbx policy allow network <domain>
+        [model_providers.sandboxd]
+        name = "Sandbox Proxy"
+        base_url = "https://chatgpt.com/backend-api/codex"
+        experimental_bearer_token = "oai-oat01-proxy-managed"
+        requires_openai_auth = false
+        EOF
+        fi
+        case "$MODE" in
+          oauth|apikey)
+            cat > /home/agent/.codex/auth.json << 'EOF'
+        {
+          "OPENAI_API_KEY": "proxy-managed"
+        }
+        EOF
+            ;;
+          *)
+            rm -f /home/agent/.codex/auth.json
+            ;;
+        esac
+      user: "1000"
+      description: Seed Codex config/auth from SBX_CRED_OPENAI_MODE
+  startup:
+    # The sandbox lives for months and its image was current only on the day it was pulled. This
+    # brings both agents to their latest release every time the sandbox starts — after a reboot,
+    # in practice — in the background, so a slow download never holds up a session. `claude update`
+    # is Claude Code's own updater; Codex has none, so its installer runs again, which replaces the
+    # binary with the current release. Both converge, so running them every start is harmless.
+    - command:
+        - sh
+        - -c
+        - |
+          export PATH="$HOME/.local/bin:$HOME/.claude/local:$PATH"
+          {
+            claude update
+            CODEX_INSTALL_DIR="$HOME/.local/bin" CODEX_NON_INTERACTIVE=true \
+              sh -c "$(curl -fsSL https://chatgpt.com/codex/install.sh)"
+          } >/dev/null 2>&1 </dev/null
+      user: "1000"
+      background: true
+      description: Update Claude Code and Codex to their latest releases
 
-  If several domains were blocked during a task, list all of them at the end rather than only the
-  first.
+# For a mixin, sbx writes this to kits-memory/agent-machine.md beside the agent's profile and adds a
+# pointer to it, rather than replacing the profile — sandboxes seed that file themselves.
+agentInstructions:
+  content: |
+    ## How to work in this sandbox
 
-  A `404`, a timeout, or a connection error is an ordinary failure and needs none of this. Only
-  `Blocked by network policy` does — that is the proxy refusing, and it is the one I can fix.
+    This sandbox is shared by every agent on this server, each in its own tmux pane.
+    Nothing from the host Mac is mounted here.
+
+    - Each project lives in its own clone under your home directory: `~/<project>`. Clone over HTTPS
+      if it is not there yet. Stay inside the project you were started in; other projects in this
+      sandbox belong to other agents.
+    - Work on a branch, never on `main`. Commit, then `git push -u origin <branch>`, and open a pull
+      request with `gh pr create` when the work is ready for review. A GitHub token is injected for
+      you; you will not see it and do not need to.
+    - Never push to `main`, force-push, or delete a branch you did not create. Merging is a person's
+      job, on GitHub.
+
+    ## Say when the network blocked you
+
+    This server may run a network policy that blocks some destinations. A request the policy refused
+    fails in one of two ways, and neither is the site's answer:
+
+    - `403` with `Blocked by network policy` — denied outright.
+    - `Approval required for <domain>` — no rule covers it, so it is held for the person who runs
+      this server to approve. The request has already failed; it will not wait for the answer.
+
+    When either happens:
+
+    - Stop and say so. Name the exact domain from the error and what you wanted from it.
+    - Do not answer from memory instead, and do not quietly try a different source.
+
+    An answer built on recalled documentation looks confident and is often wrong about current APIs.
+    Telling me you could not reach the docs is the better outcome every time, because it costs me one
+    command to fix — approving the pending request, or allowing the domain for good:
+
+        sbx policy approval ls
+        sbx policy allow network <domain>
+
+    Then retry. If several domains were blocked during a task, list all of them at the end rather
+    than only the first.
+
+    A `404`, a timeout, or a connection error is an ordinary failure and needs none of this. Only the
+    two messages above are the policy refusing, and they are the ones I can fix.
+
+    The host Mac, `localhost` on it, and private network ranges are denied on purpose. Do not try to
+    reach them.

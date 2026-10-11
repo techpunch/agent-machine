@@ -150,7 +150,7 @@ verify_needs_root() {
 }
 
 # A goal is a name a human would pick; a recipe is a name the graph uses. Accept either
-# everywhere, so `apply run-agents` and `apply have-vm-claude-code` both work.
+# everywhere, so `apply run-agents` and `apply have-agent-sandbox` both work.
 expand_targets() {
   local t out=""
   for t in "$@"; do
@@ -460,14 +460,14 @@ cmd_stale() {
   fi
 
   if sbx=$(sbx_bin 2>/dev/null); then
-    who=$(with_timeout 30 "$sbx" whoami 2>/dev/null | /usr/bin/tr -d '\r')
-    if [ -n "$who" ]; then
-      printf '   sbx         signed in as %s, policy %s\n' "$who" "${SBX_POLICY:-unset}"
-      out=$(with_timeout 30 "$sbx" ls 2>/dev/null | /usr/bin/tail -n +2 | /usr/bin/wc -l | /usr/bin/tr -d ' ')
-      printf '               %s sandbox(es) present\n' "${out:-0}"
-      [ "${out:-0}" -gt 0 ] 2>/dev/null && printf '               stale ones cost disk: sbx ls, then sbx rm <name>\n'
+    # sbx cannot say who is signed in; a listing that succeeds is the nearest cheap evidence.
+    if out=$(with_timeout 30 "$sbx" ls 2>/dev/null); then
+      printf '   sbx         account %s, policy %s\n' "${DOCKER_USER:-unrecorded}" "${SBX_POLICY:-unset}"
+      out=$(printf '%s\n' "$out" | /usr/bin/tail -n +2 | /usr/bin/grep -c . | /usr/bin/tr -d ' ')
+      printf '               %s sandbox(es) present; agents run in %s\n' "${out:-0}" "${SBX_SANDBOX:-agents}"
+      [ "${out:-0}" -gt 1 ] 2>/dev/null && printf '               only %s is needed; others cost disk: sbx ls, then sbx rm <name>\n' "${SBX_SANDBOX:-agents}"
     else
-      printf '   sbx         installed but not signed in\n'
+      printf '   sbx         installed but cannot list sandboxes — signed out or daemon down (sbx diagnose)\n'
     fi
   else
     printf '   sbx         not installed — agent sandbox checks skipped\n'
@@ -478,7 +478,8 @@ cmd_stale() {
   printf '\n== needs judgment  (run /update, which researches these)\n'
   printf '   sbx         a proprietary dependency in the agent layer — still free? still maintained?\n'
   printf '   policy      %s — is that preset still the right posture for what runs here?\n' "${SBX_POLICY:-unset}"
-  printf '   claude code  installed inside sandboxes — any advisory affecting it?\n'
+  printf '   claude code  installed inside the sandbox — any advisory affecting it?\n'
+  printf '   github       the token agents push with — still scoped to the right repos? expiry?\n'
   printf '   blocked      %s recipe(s) deferred; has anything they wait on changed?\n' \
     "$(for r in $(all_recipes); do is_blocked "$r" && echo x; done | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
 }
@@ -491,18 +492,29 @@ cmd_stale() {
 # The denial list is also the candidate allowlist. Documentation and package hosts earn a place;
 # telemetry and analytics do not.
 cmd_denials() {
-  local sbx
+  local sbx out blocked
   sbx=$(sbx_bin) || { printf 'sbx is not installed — nothing to report\n'; return 0; }
 
   printf 'Blocked requests, most recent last. Allow one with:\n'
   printf '  %s policy allow network <domain>\n\n' "$sbx"
 
-  # `policy log` covers allowed and denied; only the denials are actionable here.
+  # `policy log` prints a "Blocked requests:" table, then an "Allowed requests:" one. Only the first
+  # is actionable here.
   if ! out=$(with_timeout 60 "$sbx" policy log ${1:+"$1"} 2>/dev/null); then
     printf 'could not read the policy log\n' >&2
     return 1
   fi
-  printf '%s\n' "$out" | /usr/bin/grep -i denied || printf 'nothing denied.\n'
+  blocked=$(printf '%s\n' "$out" | /usr/bin/awk '/^Blocked requests:/ {on=1; next} /^Allowed requests:/ {on=0} on && NF')
+  if [ "$(printf '%s\n' "$blocked" | /usr/bin/grep -c .)" -gt 1 ]; then
+    printf '%s\n' "$blocked"
+  else
+    printf 'nothing blocked.\n'
+  fi
+
+  # Under balanced, a destination no rule covers is held for approval rather than refused outright.
+  # The request that raised it has already failed; approving lets the next attempt through.
+  printf '\nWaiting for approval (answer with: %s policy approval respond <id> --option allow):\n' "$sbx"
+  with_timeout 30 "$sbx" policy approval ls 2>/dev/null || printf 'could not list approvals\n'
 }
 
 cmd_log() {
@@ -567,8 +579,9 @@ cmd_record() {
     printf '   has no key expiry of its own, so nothing lapses on its own.\n'
     printf '2. Rotate the reusable auth key (Settings > Keys), so the copy in this machine\n'
     printf '   Keychain cannot rejoin the tailnet.\n'
-    printf '3. If agents were set up: sign out everywhere from the agent Claude account, to kill\n'
-    printf '   the token inside the sandbox.\n\n'
+    printf '3. If agents were set up: sign out everywhere from the agent Claude and ChatGPT\n'
+    printf '   accounts, and revoke the GitHub token agents push with. All three are held in this\n'
+    printf '   machine'"'"'s Keychain and injected into the sandbox.\n\n'
 
     printf '## Once per client\n\n'
     printf 'Add this to `~/.ssh/config` on each machine you drive this server from. Your login\n'

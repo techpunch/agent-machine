@@ -96,10 +96,11 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
      never echo it back.
 
 7. Finish with what they can now do, in commands rather than concepts. The two that matter
-   day to day are on the server: `agents` to attach to the terminal grid, and
-   `sbx run --clone claude` to put one project in its own sandbox — `codex` in place of
-   `claude` if that is the account they have. Then two things they will need later and will
-   not think to ask about:
+   day to day: `ssh <slug> -t agents` to attach to the terminal grid inside the agent
+   sandbox, and, in a pane, `git clone https://github.com/<you>/<project> ~/<project>` then
+   `claude` in it — `codex` if that is the account they have. Say that the agent pushes a
+   branch and opens a PR, and that they review and merge on GitHub. Then two things they will
+   need later and will not think to ask about:
 
    Use the server's short name in every command you show them — `ssh <slug>`, never
    `ssh <user>@<slug>.<tailnet>.ts.net`. MagicDNS is on by default and resolves the short
@@ -138,7 +139,7 @@ on it" — and let `bin/cookbook` map those to recipes. Never ask them to pick a
      machine, and the file ends with the `scp` line to do that; being *only* on the box is what
      makes it useless. So the copy that counts goes in their password manager, or a private
      note on the laptop or phone they already use as a client. Not in this repo, which is
-     shared and pushed, and never inside an agent sandbox, where anything can leave.
+     shared and pushed, and never inside the agent sandbox, where anything can leave.
 
      Have them run that `scp` from a client machine, not from the server: it is the honest
      test that remote access works, and it leaves the off-server copy behind as a side effect

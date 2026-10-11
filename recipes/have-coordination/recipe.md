@@ -1,53 +1,66 @@
 ---
 name: have-coordination
-summary: The layer you actually drive the server through — a persistent tmux grid.
-requires: [have-homebrew]
+summary: The layer you actually drive the server through — a persistent tmux grid inside the agent sandbox.
+requires: [have-shared-sandbox]
 root: no
 gates: none
 ---
 
-A tmux session on the server, one pane per project, that survives you closing the laptop. You attach
-to that one session instead of opening a terminal per agent, and detaching leaves everything running.
+A tmux session inside the shared agent sandbox, one pane per project, that survives you closing the
+laptop. You attach to that one session instead of opening a terminal per agent, and detaching leaves
+everything running.
 
-What it installs: tmux, a managed `~/.tmux.conf`, and an `agents` helper that attaches to the session
-or creates it if it is not there — `tmux new-session -A`, so there is one entry point and no way to
-end up with a second detached session you forgot about.
+What it installs: an `agents` helper on the Mac that attaches to the grid or creates it if it is not there —
+`sbx exec -it agents tmux new-session -A -s agents`, so there is one entry point and no way to end up
+with a second grid you forgot about. tmux and its config inside the sandbox come from the kit
+[`have-shared-sandbox`](../have-shared-sandbox/recipe.md) creates it with.
 
 ```
-ssh <server> -t agents        # attach the grid from anywhere on the tailnet
-sbx run --clone claude        # in a pane: one project, in its own sandbox
+ssh <server> -t agents                                    # from anywhere on the tailnet
+git clone https://github.com/<you>/<project> ~/<project>  # in a pane, once per project
+cd ~/<project> && claude                                  # or codex — bypass mode either way
 ```
 
-`sbx run` attaches you to the agent, so the pane is the session. There is no second step and nothing
-to SSH into per project — one connection to the server reaches every agent. If you want a shell in a
-sandbox rather than its agent, that is `sbx setup ssh` once, then `ssh <sandbox>.sbx`, which is an
-escape hatch for debugging a build rather than the way in.
+Every pane is already inside the sandbox, so an agent is just `claude` or `codex`. They start in
+bypass mode because the kit aliases them that way —
+a session started from a shell does not get the defaults `sbx run` would add. Typing `claude` on the
+Mac itself is the one thing not to do: that runs on macOS, outside the sandbox, with everything the
+sandbox exists to protect.
 
 Why tmux rather than Zellij, herdr or an agent manager is argued in
 [`../../docs/host-agent-design.md`](../../docs/host-agent-design.md). herdr is the one alternative
-that passes on paper and is worth trialling inside this grid; that doc has the test that would make
-it the default.
+that passes on paper and is worth trialling; that doc has the test that would make it the default.
 
-## Why the grid is on the host now
+## Why the grid is inside the sandbox
 
-It used to live inside the VM, because the VM was the one long-lived guest everything ran in. With
-`sbx` there is no single guest — each project gets its own sandbox — so a grid inside any one of them
-would only see that project, and would vanish with it.
+It was on the Mac while the design was one sandbox per project, because there was no single guest to
+put it in — a grid inside any one sandbox would only have seen that project. Now there is one sandbox
+for everything, so the grid goes back inside it, where every pane starts in the right place and
+nothing per pane has to cross the boundary.
 
-So the grid runs on the Mac and each pane attaches to a sandbox. That is simpler in a way worth noting:
-this recipe no longer depends on the agent layer at all. It requires only Homebrew, which means the
-terminal grid works whether or not you have got as far as installing `sbx`.
+What that costs: the grid lives and dies with the sandbox. Stopping or recreating the sandbox takes
+the grid with it — but it takes every agent with it too, so nothing extra is lost.
 
-## The session is not restarted for you
+## After a reboot
 
-tmux sessions live and die with the login session. After a reboot the grid is gone and `agents`
-creates a fresh one. That is deliberate — auto-recreating panes would mean auto-starting agent runs,
-and the posture here is to bring the machine back unattended but launch agent work by hand.
+Neither the sandbox nor the grid comes back by itself. That is deliberate — auto-recreating panes
+would mean auto-starting agent runs, and the posture here is to bring the machine back unattended but
+launch agent work by hand. The first `agents` after a reboot starts the sandbox, because `sbx exec`
+starts a stopped one, and creates a fresh grid in it. The checkouts inside are still there.
+
+## Not yet confirmed on a real server
+
+That the grid survives the `agents` connection ending. tmux forks its server away from the client,
+which is what keeps sessions alive on any Linux box, and the sandbox is detached so it keeps running;
+but whether `sbx exec` reaps everything it started when the session ends is not documented. Attach,
+start something in a pane, drop the SSH connection without detaching, reconnect, and check. If it
+does not survive, the fallback is tmux on the Mac with each pane running `sbx exec -it agents bash`,
+and this file should say so.
 
 ## Phone access
 
 An SSH client on the phone — Termius, Blink, Termux — over Tailscale, then the same
-`ssh <server> -t agents`. Same grid, same panes, nothing extra installed on the server.
+`ssh <server> -t agents`. Same grid, same panes, nothing extra installed anywhere.
 
 Claude Code Remote Control is a second way in, and it is off by default. `/remote-control` used to
 fail inside a sandbox: the proxy that makes the sign-in safe rewrites the `Authorization` header on
@@ -64,11 +77,15 @@ page name the setting and say nothing about what it changes in the intercept, so
 host-held credential stays masked inside the sandbox is undocumented either way.
 
 Not turned on by this recipe, for two reasons. The grid is still the way in: it surveys every project
-at once rather than driving one session, which is what this machine is for. And the fix is half
-landed — the outbound half connects while the inbound stream stalls, so commands sent from a phone
-hang until something is typed in the sandbox, reported against v0.39.0 in
-docker/sbx-releases#12 and unresolved. Turn it on if you want the phone-browser path anyway; it costs
-one command and nothing else here depends on it.
+at once rather than driving one session, which is what this machine is for. And on current stable it
+does not work. The stall reported against v0.39.0 was fixed by v0.42, then v0.43 stopped forwarding
+credentials the proxy did not issue, and `/rc` has asked for `/login` and failed with a 401 ever
+since — still the case on v0.47.0. Docker closed
+[docker/sbx-releases#12](https://github.com/docker/sbx-releases/issues/12) on 9 October 2026 with the
+fix in v0.48.0-rc3, to ship in v0.48.0, and the setting is still required after it. Server mode,
+`claude remote-control`, is a separate open bug,
+[#695](https://github.com/docker/sbx-releases/issues/695). Turn it on once v0.48.0 is out if you want
+the phone-browser path; it costs one command and nothing else here depends on it.
 
 Codex Remote is the equivalent on the OpenAI side, and it fails here for a different reason — not the
 proxy, the shape. It is driven from the ChatGPT desktop app: Settings > Connections >

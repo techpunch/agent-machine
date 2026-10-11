@@ -17,8 +17,10 @@ Then offer to apply, and be specific about consequence, because these are not eq
 
 - `brew upgrade` — usually safe, occasionally breaks a formula something else depends on.
   Say how many packages. On a server running agents, take it.
-- Stale sandboxes (`sbx ls`, then `sbx rm <name>`) — they cost disk and hold nothing you
-  need once the work has been fetched out.
+- Extra sandboxes. Agents run in one, `SBX_SANDBOX` (default `agents`); any other in `sbx ls` is
+  left over and costs disk — `sbx rm <name>`, which asks for confirmation. Never remove the
+  shared one without saying what it holds: removing it deletes every checkout inside, and
+  anything not yet pushed is gone.
 - macOS updates — these reboot the machine. Fine on a server that has proved it comes back
   unattended, and `make-headless` is exactly that proof. Confirm before triggering, tell the
   user it will drop the connection, and say roughly how long before it is reachable again.
@@ -30,8 +32,12 @@ Do not batch these into one silent sweep. Apply, confirm each worked, and say wh
 Everything under `== needs judgment` is a question about the world, so research it. This part
 produces a commit, not a patched machine, and the fix reaches every server that pulls the repo.
 
-- The `sbx` network policy preset. Is the recorded `SBX_POLICY` still the right posture for
-  what actually runs on this box? Tightening it is cheap; discovering it was too loose is not.
+- The `sbx` network policy preset. `allow-all` is the default, chosen so agents can read any
+  documentation. Is that still right for what actually runs in the sandbox, and does
+  `have-agent-sandbox`'s verify still show a sandbox cannot reach the Mac's SSH? `allow-all`
+  keeps the Mac out only because of the deny rules apply adds.
+- The GitHub token agents push with. Still limited to the repos agents work on, still a ruleset
+  on `main` in each, and how long until it expires?
 - `sbx` itself. It is proprietary and free at time of writing — check that both are still
   true, and look for releases that fix something worth having. A newer version for its own
   sake is not a reason; a fix is.

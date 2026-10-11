@@ -89,8 +89,8 @@ pending.
 ## Yolo mode on the host is for this repo only
 
 Running with permissions skipped on the host Mac is justified for cookbook work and nothing else. If
-asked to work on any other project from a host session, say so and move the work into a sandbox
-(`sbx run --clone`) rather than doing it on the host. Do not make an
+asked to work on any other project from a host session, say so and move the work into the agent
+sandbox (`ssh <server> -t agents`, then clone it there) rather than doing it on the host. Do not make an
 exception because a change looks small — that exception is how the boundary stops existing.
 
 The full argument, and the rule about what may live in a sandbox, is in `docs/secrets-and-egress.md`.
@@ -117,8 +117,8 @@ That file is the single source for it; do not restate it elsewhere.
   recipe), `update` (what has gone stale, and fix it). Thin wrappers over `bin/cookbook` that say
   what Claude's part of the job is.
 - `docs/` — `running-the-cookbook.md` (the driver's guarantees, the two records, what not to do),
-  `secrets-and-egress.md` (where agents may run, and with what), `pushing-agent-code.md` (getting
-  work out of a sandbox), `host-agent-design.md` (why the host and agents are separate),
+  `secrets-and-egress.md` (where agents may run, and with what), `pushing-agent-code.md` (how
+  agents push their work), `host-agent-design.md` (what the machine is for, and why it is built so),
   `shared-setup.md` (once, before the first server).
 
 Goals, recipes and prereqs share one frontmatter format, so `meta_file()` parses all three.

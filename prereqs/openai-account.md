@@ -19,7 +19,8 @@ sbx secret set openai --oauth
 
 That opens a browser on the server, which a headless machine reaches through screen sharing — so do
 it before the monitor comes off, or over the screen-sharing session `make-remote-accessible` sets
-up. The tokens land in the host keychain and the proxy injects them into outbound requests, so no
+up. Do it before the agent sandbox is created: Codex's setup inside it is fixed then, from whether a
+sign-in exists, and `have-shared-sandbox` waits for it. The tokens land in the host keychain and the proxy injects them into outbound requests, so no
 sandbox ever holds the credential. `sbx secret set openai` without `--oauth` stores an API key
 instead, which buys no isolation the subscription does not already have and swaps a flat plan for
 metered billing.

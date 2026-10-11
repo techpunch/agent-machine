@@ -2,36 +2,23 @@
 . "$(dirname "$0")/../../lib/common.sh"
 
 home=$(_admin_home)
-session="${TMUX_SESSION:-agents}"
+name="${SBX_SANDBOX:-agents}"
 
-tmux=""
-for c in /opt/homebrew/bin/tmux /usr/local/bin/tmux /usr/bin/tmux; do
-  [ -x "$c" ] && { tmux="$c"; break; }
-done
-if [ -n "$tmux" ]; then
-  ok "tmux at $tmux ($("$tmux" -V 2>/dev/null))"
+if [ -x "$home/.local/bin/agents" ]; then
+  ok "agents helper present and executable"
+  /usr/bin/grep -q "exec -it \"$name\" tmux" "$home/.local/bin/agents" \
+    && ok "agents helper attaches to the grid inside sandbox '$name'" \
+    || miss "agents helper does not point at sandbox '$name' — re-run apply"
 else
-  miss "tmux not installed"
-  verify_result
+  miss "no ~/.local/bin/agents helper"
 fi
 
-[ -f "$home/.tmux.conf" ] && ok "~/.tmux.conf present" \
-                          || miss "no ~/.tmux.conf"
-
-[ -x "$home/.local/bin/agents" ] && ok "agents helper present and executable" \
-                                 || miss "no ~/.local/bin/agents helper"
-
-grep -q '\.local/bin' "$home/.zprofile" 2>/dev/null \
-  && ok "~/.local/bin on PATH for a login shell" \
+grep -q '\.local/bin' "$home/.zshenv" 2>/dev/null \
+  && ok "~/.local/bin on PATH for 'ssh <server> agents', via ~/.zshenv" \
   || miss "~/.local/bin not on PATH — the agents helper won't be found"
 
-# A grid that is not currently running is not a failure: tmux sessions live with the login
-# session, and a fresh boot has none until you attach. Report it rather than failing on it.
-if "$tmux" has-session -t "$session" 2>/dev/null; then
-  panes=$("$tmux" list-panes -s -t "$session" 2>/dev/null | /usr/bin/wc -l | /usr/bin/tr -d ' ')
-  ok "session '$session' is running ($panes pane(s))"
-else
-  note "session '$session' not running — 'agents' will create it"
-fi
+# tmux and its config come from the kit when the sandbox is created, and reading them means
+# `sbx exec`, which starts a stopped sandbox. A verify must not change the machine, so they are not
+# re-read here; have-shared-sandbox's apply checks tmux is there after creating it.
 
 verify_result
