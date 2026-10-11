@@ -99,6 +99,7 @@ That file is the single source for it; do not restate it elsewhere.
 ## Layout
 
 - `README.md` — the landing page: what this is, what works, where to go.
+- `FAQ.md` — short answers to the questions people ask about the design, linking to the docs.
 - `bin/cookbook` — the driver: dependency resolution, verify/apply ordering, sudo, ledger, log.
 - `bin/check` — everything checkable without a Mac: syntax, shellcheck, recipe and goal metadata,
   link integrity, and a dry run of the driver against a throwaway state dir. Run it before pushing.

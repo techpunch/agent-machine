@@ -140,6 +140,7 @@ In case you're curious to know more about how it works and the internals:
 - [`docs/host-agent-design.md`](docs/host-agent-design.md) — what this machine is for, and why it is
   built this way.
 - [`docs/shared-setup.md`](docs/shared-setup.md) — accounts and tailnet, once before the first server.
+- [`FAQ.md`](FAQ.md) — short answers, starting with why sbx rather than Colima.
 - [`CLAUDE.md`](CLAUDE.md) — repo layout and how to write a recipe.
 
 Agent isolation uses [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/), which is
