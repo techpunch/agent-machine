@@ -39,14 +39,29 @@ that session instead and keep it refreshed. It is not the default here because a
 usually your whole account rather than a few repos, and GitHub's own docs steer fine-grained tokens
 away from `gh auth login`. A scoped token stored directly is both simpler and narrower.
 
+## What Docker's own people have said about it
+
+The docs say only that the `github` service "gives the agent access to the `gh` CLI". Two things
+said on Docker's tracker go further:
+
+- `git push` over HTTPS is covered. A Docker engineer, explaining why a GitLab kit could not do what
+  GitHub's built-in credential already does, wrote that GitHub's "Bearer traffic goes to
+  `api.github.com` while git-over-HTTPS goes to `github.com` — two different domains, so each inject
+  rule matches"
+  ([docker/sbx-releases#552](https://github.com/docker/sbx-releases/issues/552)). The proxy adds the
+  credential to every request to those hosts, so git never has to ask for one.
+- `gh` needs the token stored before the sandbox is created. Injection starts as soon as it is
+  stored, but the placeholder `GH_TOKEN` that tells `gh` to try is set only at creation
+  ([#477](https://github.com/docker/sbx-releases/issues/477),
+  [#25](https://github.com/docker/sbx-releases/issues/25)). That is why `have-shared-sandbox`
+  requires this recipe.
+
 ## Not yet confirmed on a real server
 
-That the token is injected into the agent sandbox at all. `github` is a built-in service, but
-Docker's credentials page says the proxy injects only for services the sandbox's kit declares, and
-the claude kit the sandbox is built on declares only `anthropic`. If `gh auth status` in a pane shows
-no token, the cookbook's kit has to declare `github` as well — Docker documents `scheme: basic` with
-`username: x-access-token` as the form for Git over HTTPS.
-
-And that the injected token reaches `git push` over HTTPS, not only `gh` and the API. Docker lists
-`github.com` among the hosts the `github` service is injected for, which says it does, but its docs
-only describe the `gh` case. Push a branch from the sandbox on the first run and fix this section.
+That a sandbox created as `claude` gets the `github` service at all. Docker's credentials page says
+the proxy injects for services the kit declares, and the claude kit declares only `anthropic` — but
+the same page says a stored `github` secret is injected into requests to its listed hosts, and #25
+was reported from a Claude Code sandbox whose `gh` worked once the placeholder was set. In a pane, run
+`gh auth status`, then push a branch. If either fails, the cookbook's kit has to declare `github` —
+Docker documents `scheme: basic` with `username: x-access-token` as the form for Git over HTTPS —
+and this section should say which one it was.

@@ -47,10 +47,12 @@ if with_timeout 180 "$sbx" create --pull missing --name "$probe" shell >/dev/nul
   # The wall around the Mac, tested by behaviour: `policy check` has reported a host deny rule that
   # the proxy did not enforce (docker/sbx-releases#546). sshd speaks first, so reading "SSH-" back
   # means the connection reached it. Tried by the host name sbx provides and by the Mac's own
-  # LAN and tailnet addresses.
+  # LAN and tailnet addresses. And by a public hostname that resolves to the LAN address — sslip.io
+  # answers <ip>.sslip.io with <ip> — because a rule for an address range need not apply to a name
+  # that resolves into it, and that is how a prompt injection would try.
   targets="host.docker.internal"
   lan=$(/usr/sbin/ipconfig getifaddr en0 2>/dev/null || /usr/sbin/ipconfig getifaddr en1 2>/dev/null || true)
-  [ -n "$lan" ] && targets="$targets $lan"
+  [ -n "$lan" ] && targets="$targets $lan $lan.sslip.io"
   ts=$(ts_cli) && tsip=$("$ts" ip -4 2>/dev/null | /usr/bin/head -1) && [ -n "$tsip" ] \
     && targets="$targets $tsip"
   for t in $targets; do

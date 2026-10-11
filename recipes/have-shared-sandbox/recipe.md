@@ -1,7 +1,7 @@
 ---
 name: have-shared-sandbox
 summary: One long-lived sandbox that every agent on this server runs in.
-requires: [have-agent-sandbox]
+requires: [have-agent-sandbox, join-github]
 root: no
 gates: none
 ---
@@ -27,6 +27,10 @@ What apply does:
 - Before creating the sandbox, gates until the Codex sign-in is stored (`CODEX=off` skips it), and
   writes the binding that lets sbx hand that sign-in to our kit. The kit sets Codex up from whether a
   sign-in exists when the sandbox is created, so storing it afterwards means recreating the sandbox.
+- Requires [`join-github`](../join-github/recipe.md) for the same reason. The proxy starts injecting
+  a GitHub token the moment it is stored, but the placeholder `GH_TOKEN` that makes `gh` try at all
+  is set only when a sandbox is created — a Docker maintainer says as much in
+  [docker/sbx-releases#477](https://github.com/docker/sbx-releases/issues/477).
 
 ## Day to day
 
@@ -89,10 +93,6 @@ None of that reaches the Mac. That is the line this design holds.
   created as `claude`; that sbx sets `SBX_CRED_OPENAI_MODE` for a credential a mixin declares, as it
   does for its own codex kit, since Codex's config is seeded from it; and that the update step runs
   at start. Run `codex` in a pane, and `claude --version` after a restart.
-- Where the kit's guidance lands in a sandbox with no workspace. Docker documents a mixin's
-  instructions going beside the agent's profile, which "lives in the parent directory of the mounted
-  workspace", and this sandbox mounts none. Ask an agent what it was told on the first run.
-- That the GitHub token is injected here at all. `github` is a built-in service, but Docker's
-  credentials page says the proxy injects only for services the agent's kit or a mixin declares, and
-  the claude kit declares only `anthropic`. If `gh auth status` in a pane shows no token, the kit
-  has to declare `github` as well.
+- That both agents got the kit's guidance. Ask each one what it was told about pushing to `main`.
+- That `gh auth status` in a pane shows the injected token, and that `git push` of a branch works —
+  see [`join-github`](../join-github/recipe.md), which has the evidence for both.

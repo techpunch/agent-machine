@@ -438,11 +438,16 @@ real server. Every one is also written into the recipe it affects:
   client, but whether `sbx exec` reaps what it started is not documented. See
   [`have-coordination`](../recipes/have-coordination/recipe.md).
 - Whether the deny rules that keep sandboxes off the Mac hold — `allow-all` does not do it alone,
-  so `have-agent-sandbox` denies `localhost`, `host.docker.internal` and the private ranges, and its
-  verify tries the Mac's SSH from inside a sandbox. See
+  so `have-agent-sandbox` denies `localhost`, `host.docker.internal` and the private ranges, IPv6
+  included, and its verify tries the Mac's SSH from inside a sandbox — by address, and by a public
+  hostname that resolves to the LAN address, since nothing published says a range rule catches
+  that. See
   [`have-agent-sandbox`](../recipes/have-agent-sandbox/recipe.md).
-- Whether the injected GitHub token reaches `git push` over HTTPS and not only `gh`. Docker lists
-  `github.com` among its hosts, which says yes. See [`join-github`](../recipes/join-github/recipe.md).
+- Whether a sandbox created as `claude` gets the GitHub token. A Docker engineer has written that
+  the built-in GitHub credential covers git over HTTPS as well as the API, and the token is stored
+  before the sandbox is created so `gh` gets its placeholder; what is unproven is only that the
+  claude kit, which does not declare `github`, still gets it. See
+  [`join-github`](../recipes/join-github/recipe.md).
 - Whether Codex works in the one sandbox. It is created as `claude`, so the kit installs Codex and
   declares its sign-in, copied from Docker's codex kit; none of that has run yet. See
   [`have-shared-sandbox`](../recipes/have-shared-sandbox/recipe.md).

@@ -60,16 +60,25 @@ rule. And the Mac's LAN and tailnet addresses are private addresses like any oth
 answers on all three.
 
 So apply adds deny rules, which outrank every allow, `**` included: `localhost`, `127.0.0.0/8`,
-`host.docker.internal`, the three RFC 1918 ranges, link-local `169.254.0.0/16` and the tailnet's
-`100.64.0.0/10`. The internet stays open; the Mac and the LAN do not. Verify does not trust
-`sbx policy check` for this — it has reported a host deny rule the proxy then did not enforce
-([docker/sbx-releases#546](https://github.com/docker/sbx-releases/issues/546)) — so it tries the
-Mac's SSH from inside the probe sandbox by `host.docker.internal`, the LAN address and the tailnet
-address, and goes red if any answers.
+`host.docker.internal`, the three RFC 1918 ranges, link-local `169.254.0.0/16`, the tailnet's
+`100.64.0.0/10`, and IPv6 loopback, unique-local and link-local. The internet stays open; the Mac and
+the LAN do not. Docker's rule syntax takes IPv4 and IPv6 ranges alike. It refuses a deny that repeats
+an allow for the very same resource ([#610](https://github.com/docker/sbx-releases/issues/610)), which
+these are not.
 
-Not yet seen on a real server: that the rules hold, including for a hostname that resolves to a
-private address, and that denying `localhost` breaks nothing sbx itself needs. IPv6 private ranges
-are not denied, because no IPv6 form of `policy check` is documented to test them with.
+Verify does not trust `sbx policy check` for this — it has reported a host deny rule the proxy then
+did not enforce ([docker/sbx-releases#546](https://github.com/docker/sbx-releases/issues/546)) — so it
+tries the Mac's SSH from inside the probe sandbox by `host.docker.internal`, the LAN address, the
+tailnet address, and `<lan-address>.sslip.io`, a public name that resolves to the LAN address. That
+last one is there because nothing Docker publishes says a range rule applies to a hostname that
+resolves into it, and one user had to allow an address as a range, a bare address and an
+address-with-port before it matched ([#59](https://github.com/docker/sbx-releases/issues/59)). If it
+answers, the deny rules do not cover names, and there is no fix in this recipe to reach for — say so.
+
+Denying `localhost` does not stop an agent testing its own dev server. The sandbox sets
+`no_proxy=localhost,127.0.0.1,::1` (visible in #59), so loopback traffic inside the sandbox never
+reaches the proxy whose rules these are. Not yet seen on a real server: that the rules hold, and that
+denying `localhost` breaks nothing sbx itself needs.
 
 `SBX_POLICY=balanced` on a first run picks the stricter preset instead: AI providers, package
 managers, code hosts and registries only. Under it, a destination no rule covers is held for
@@ -82,8 +91,8 @@ source is itself the thing to protect; not the default here.
 Both run in the same sandbox. Three differences worth knowing:
 
 - The sign-in starts on the host rather than inside the sandbox. `sbx secret set openai --oauth`
-  opens a browser on the machine you run it on, which on a headless server means screen sharing —
-  see [`../../prereqs/openai-account.md`](../../prereqs/openai-account.md). Claude Code's `/login` is
+  opens a browser on the machine you run it on, which on a headless server means screen sharing or
+  an SSH tunnel — see [`../../prereqs/openai-account.md`](../../prereqs/openai-account.md). Claude Code's `/login` is
   typed inside the sandbox and reaches the host from there. Both end the same way: tokens in the host
   keychain, injected by the proxy, never written inside a sandbox.
 - Bypass mode is a flag you type, or an alias. `sbx run codex` adds
@@ -94,9 +103,14 @@ Both run in the same sandbox. Three differences worth knowing:
 There is one sandbox and every agent runs in it, but `sbx create` still takes an agent name. The name
 picks a kit — the image, the default command, where guidance goes, and which sign-ins the proxy
 handles — and the sandbox is created as `claude`, which brings Claude Code and its `/login` and
-nothing for Codex. So the kit below adds Codex: it installs it, and declares the OpenAI sign-in the
-same way Docker's codex kit does. sbx has supported several OAuth-signed-in agents in one sandbox
-since v0.45.0.
+nothing for Codex. It has to be `claude`: a kit under any other name that declares the same
+Anthropic sign-in does not get it injected, and a Docker maintainer said that may stay so "due to
+legal reasons around their subscription model"
+([docker/sbx-releases#270](https://github.com/docker/sbx-releases/issues/270)). So the kit below adds
+Codex: it installs it, and declares the OpenAI sign-in the same way Docker's codex kit does. sbx has
+supported several OAuth-signed-in agents in one sandbox since v0.45.0, and a mixin declaring a
+credential no longer knocks Claude Code's subscription sign-in into API-key mode since the release
+after v0.43 ([#344](https://github.com/docker/sbx-releases/issues/344)).
 
 ## The kit
 
@@ -109,11 +123,15 @@ carries:
 - tmux and its config (`kit/files/home/.tmux.conf`) for the grid, and `claude` and `codex` aliased
   to start in bypass mode from a shell.
 - An update at every sandbox start, in the background: `claude update`, and Codex's installer run
-  again, since Codex has no updater of its own. The image was current only on the day it was pulled,
-  and the sandbox lives for months.
-- What every agent here should be told: clone into the home directory, push branches, never `main`,
-  leave the Mac and private ranges alone, and — for a preset stricter than `allow-all` — report a
-  blocked request rather than work around it.
+  again — which is what `codex update` does, called directly so the flags are explicit. The image
+  was current only on the day it was pulled, and the sandbox lives for months.
+- `GIT_TERMINAL_PROMPT=0`, from Docker's codex kit, so a push GitHub refuses fails and says so
+  instead of git waiting at a username prompt nobody will answer.
+- What every agent here should be told, in `kit/files/home/.codex/AGENTS.md`: clone into the home
+  directory, push branches, never `main`, leave the Mac and private ranges alone, and — for a preset
+  stricter than `allow-all` — report a blocked request rather than work around it. Codex reads that
+  file as its global instructions, and `kit/files/home/.claude/CLAUDE.md` imports it for Claude Code,
+  so there is one copy and both agents get it.
 - A starter documentation allowlist, which only matters under a stricter preset.
 
 The Codex parts are copied rather than written, from
@@ -125,11 +143,12 @@ binding in `~/.config/sbx/credentials.yaml`, and with nobody at the screen it wi
 credential silently rather than ask. `have-shared-sandbox` writes that binding before it creates the
 sandbox, which is what Docker documents for unattended runs.
 
-It is a kit rather than a `~/.claude/CLAUDE.md` because sandboxes inherit nothing from the host —
-your Mac's `~/.claude` stays on your Mac — and because a kit is a committed file, so it is reviewable
-in this repo instead of living in one machine's local state. A mixin's `agentInstructions` are written
-to a `kits-memory/` file beside the agent's profile with a pointer from the profile, rather than
-replacing it.
+It is a kit rather than your Mac's own `~/.claude/CLAUDE.md` because sandboxes inherit nothing from
+the host, and because a kit is a committed file, so it is reviewable in this repo instead of living in
+one machine's local state. The guidance is plain files rather than the kit's `agentInstructions`
+field because that field writes beside the profile sbx generates next to a mounted workspace, and this
+sandbox mounts none; and Codex does not read that profile at all
+([docker/sbx-releases#567](https://github.com/docker/sbx-releases/issues/567)).
 
 Loading it from a path in this repo is fine. Remote kit sources are allowlisted to Docker Hub by
 default under `kit.allowedSources`, but local directories are governed separately by

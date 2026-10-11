@@ -104,18 +104,27 @@ fi
 # reaches the Mac's own services through host.docker.internal, which the proxy turns into
 # localhost, and the Mac's LAN and tailnet addresses are private ranges. Deny rules outrank every
 # allow, `**` included, so these keep the Mac out while the internet stays open. LAN devices go
-# with them; nothing here needs them. Each pair is the rule and an address `policy check` can test
-# it with, so a rule already in place is not added twice.
-deny_pairs="localhost:localhost
-127.0.0.0/8:127.0.0.1
-host.docker.internal:host.docker.internal
-10.0.0.0/8:10.0.0.1
-172.16.0.0/12:172.16.0.1
-192.168.0.0/16:192.168.1.1
-169.254.0.0/16:169.254.169.254
-100.64.0.0/10:100.100.100.100"
-while IFS=: read -r rule probe; do
-  if with_timeout 30 "$sbx" policy check network "$probe" 2>/dev/null | /usr/bin/grep -q '^Denied'; then
+# with them; nothing here needs them. The IPv6 rules cover loopback, unique-local (the tailnet's
+# IPv6 range is one) and link-local. Each line is the rule and an address `policy check` can test it
+# with, so a rule already in place is not added twice; for an IPv6 rule its own text in `policy ls`
+# counts too, in case `policy check` reads an IPv6 address differently. Docker refuses a deny that
+# repeats an allow for the very same resource (docker/sbx-releases#610), but these are ranges under
+# `**`, which its docs describe as the way to block destinations under a broad allow.
+deny_rules="localhost localhost
+127.0.0.0/8 127.0.0.1
+host.docker.internal host.docker.internal
+10.0.0.0/8 10.0.0.1
+172.16.0.0/12 172.16.0.1
+192.168.0.0/16 192.168.1.1
+169.254.0.0/16 169.254.169.254
+100.64.0.0/10 100.100.100.100
+::1/128 ::1
+fc00::/7 fd00::1
+fe80::/10 fe80::1"
+rules_now=$(with_timeout 30 "$sbx" policy ls 2>/dev/null || true)
+while read -r rule probe; do
+  if with_timeout 30 "$sbx" policy check network "$probe" 2>/dev/null | /usr/bin/grep -q '^Denied' \
+     || { case "$rule" in *:*) printf '%s\n' "$rules_now" | /usr/bin/grep -qF -- "$rule" ;; *) false ;; esac; }; then
     ok "sandboxes cannot reach $rule"
   else
     with_timeout 30 "$sbx" policy deny network "$rule" >/dev/null \
@@ -123,7 +132,7 @@ while IFS=: read -r rule probe; do
     ok "denied sandbox access to $rule"
   fi
 done <<EOF
-$deny_pairs
+$deny_rules
 EOF
 
 # sbx forwards the host's SSH agent into every sandbox by default, and on this machine that agent

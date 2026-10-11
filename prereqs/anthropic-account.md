@@ -11,8 +11,11 @@ The agent signs in as you, so you need a Claude Pro or Max subscription — the 
 anywhere else.
 
 The sign-in happens inside the agent sandbox, with `/login` the first time you run `claude` there.
-Nothing runs a browser in the sandbox or on the server: `/login` prints a link, you open it on your
-laptop or phone, approve, and paste the code it shows back into the terminal.
+No browser runs in the sandbox. sbx hands links a sandbox opens to the Mac's own browser — a Docker
+maintainer says Claude Code's login goes that way
+([docker/sbx-releases#550](https://github.com/docker/sbx-releases/issues/550)) — so the sign-in page
+may open on the Mac, where Screen Sharing reaches it. `/login` also prints the link, so you can open
+it on your laptop or phone instead, approve, and paste the code it shows back into the terminal.
 
 It cannot reuse a login you already made with Claude Code on the Mac itself. sbx has no way to import
 one — sharing a subscription login is an open request,
