@@ -1,9 +1,9 @@
 # agent-machine
 
 Interactively turns a spare Mac into an always-on server that runs sandboxed coding agents —
-Claude Code and Codex, one microVM per project. Reachable from any device on your tailnet
-with options to run headless and/or act as a VPN exit node. Logs actions and changes made
-to computer.
+Claude Code and Codex, all in one sandbox that keeps them off the Mac itself. Reachable from
+any device on your tailnet with options to run headless and/or act as a VPN exit node. Logs
+actions and changes made to computer.
 
 WARNING: this project is suggested to be run with `claude --dangerously-skip-permissions`. It
 also suggests that you turn off FileVault encryption if you want your server to auto restart.
@@ -62,9 +62,9 @@ git clone https://github.com/bobfejes/claude-clojure-plus.git ~/.claude
 It's a conversation that gets you to your end goal machine state as quickly as possible.
 
 Before it starts, it tells you what it needs from you, and only what it needs given what you
-picked — a Tailscale key, your admin password, a Docker account for the agent sandboxes, a Claude
-subscription, an HDMI dummy plug if you want the machine headless. It installs everything else
-itself.
+picked — a Tailscale key, your admin password, a Docker account for the agent sandbox, a Claude
+subscription, a GitHub token for the agents to push with, an HDMI dummy plug if you want the
+machine headless. It installs everything else itself.
 
 It proves the server survives a reboot untouched *before* it tells you it is safe to unplug the
 keyboard and swap the monitor for the dongle.
@@ -80,9 +80,22 @@ finished step is a no-op.
 | Keep running unattended | Never sleeps, comes back by itself after a power cut |
 | Run with no monitor or keyboard | Proves reboot survival first, then you unplug |
 | Route your traffic through it | Use it as a Tailscale exit node on untrusted wifi |
-| Run coding agents on it | WIP - Claude Code or Codex, a microVM each, egress under policy |
-| Drive many projects at once | WIP - A persistent terminal grid you attach to from anywhere |
+| Run coding agents on it | WIP - Claude Code and Codex in one sandbox, pushing branches to GitHub |
+| Drive many projects at once | WIP - A persistent terminal grid inside the sandbox, from anywhere |
 | Stop running what nobody uses | Spotlight, screen saver and desktop widgets off, so agents get the CPU |
+
+## Using the agents (WIP)
+
+From your laptop or phone, `ssh <your-mac> -t agents` drops you into the terminal grid inside the
+sandbox. In a pane, clone a project and start an agent:
+
+```
+git clone https://github.com/<you>/<project> ~/<project> && cd ~/<project>
+claude        # or codex
+```
+
+The agent works on a branch and opens a pull request; you review and merge on GitHub. Why it is
+built this way is in [`docs/host-agent-design.md`](docs/host-agent-design.md).
 
 ## Ask it things later
 
@@ -119,11 +132,12 @@ In case you're curious to know more about how it works and the internals:
 
 - [`docs/running-the-cookbook.md`](docs/running-the-cookbook.md) — driving it yourself without
   `/setup`, and reading the records it leaves behind.
-- [`docs/secrets-and-egress.md`](docs/secrets-and-egress.md) — what may live in a sandbox, and why yolo
+- [`docs/secrets-and-egress.md`](docs/secrets-and-egress.md) — what may live in the sandbox, and why yolo
   mode on the Mac itself is only for this repo. Read before putting a project in there.
-- [`docs/pushing-agent-code.md`](docs/pushing-agent-code.md) — getting the agent's work out of a
-  sandbox and pushed, without a credential that can reach your real branches.
-- [`docs/host-agent-design.md`](docs/host-agent-design.md) — why the host and the agents are separate.
+- [`docs/pushing-agent-code.md`](docs/pushing-agent-code.md) — how agents push branches, and what
+  stops that reaching `main`.
+- [`docs/host-agent-design.md`](docs/host-agent-design.md) — what this machine is for, and why it is
+  built this way.
 - [`docs/shared-setup.md`](docs/shared-setup.md) — accounts and tailnet, once before the first server.
 - [`CLAUDE.md`](CLAUDE.md) — repo layout and how to write a recipe.
 
