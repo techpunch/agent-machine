@@ -316,7 +316,7 @@ sandbox.
 |---|---|---|---|
 | tmux | yes | yes | yes |
 | Zellij | yes | yes | Codex scrollback broken over SSH |
-| herdr | documented; untested for an SSH-started server on macOS | yes | yes, with `HERDR_AGENT` on the `sbx` command |
+| herdr | documented; untested inside the sandbox | yes | yes, with `HERDR_AGENT` on the `sbx` command |
 | cmux, Zentty | no | no | — |
 | claude-squad, workmux, NTM | yes | yes | no — git worktrees |
 | Conductor, Nimbalyst, Vibe Kanban | no | no | — |
@@ -336,65 +336,73 @@ section. Moving inside the sandbox did not change the choice of tmux, only where
 
 ### herdr, the one that passes on paper
 
-[herdr](https://github.com/herdrdev/herdr) is an agent multiplexer: a single Rust binary, Apache-2.0
-since v0.8.0, at 0.9.3 in homebrew-core as of October 2026 and releasing every week or two. It is a
-background server plus a TUI client, so it needs no GUI session, and it replaces tmux rather than
-sitting on it — its own panes, prefix key (`ctrl+b`), copy mode and named sessions. Detach is
-`ctrl+b q`, reattach is running `herdr` again, and its README says panes keep running when you
-close the client or lose the SSH connection. A pane runs any command; worktrees are offered, not
-required, so `sbx run --clone` from the main checkout works.
+[herdr](https://github.com/herdrdev/herdr) is an agent multiplexer: a single Rust binary, Apache-2.0,
+at 0.9.3 as of October 2026 and releasing every week or two, with prebuilt Linux aarch64 binaries. It
+is a background server plus a TUI client, so it needs no GUI session, and it replaces tmux rather
+than sitting on it — its own panes, prefix key (`ctrl+b`), copy mode and named sessions. Detach is
+`ctrl+b q`, reattach is running `herdr` again, and its docs say panes keep running when you close the
+client or lose the SSH connection.
 
-What it adds is the thing tmux does not have: each pane carries a state — blocked, working, done,
-idle — rolled up into a sidebar, a picker that jumps to whatever is blocked, and notifications that
-work over SSH. On a grid of agents that is the difference between scanning every pane and being
-told which one wants you. Its docs also cover phones directly: plain SSH, and a TUI that adapts to
-narrow screens.
+What it adds over tmux, in the shape this machine now has — one sandbox, the grid inside it:
 
-How that works here depends on where herdr runs, and the grid moving inside the sandbox changed the
-answer:
-
-- On the Mac, it detects an agent from the pane's foreground process, and under `sbx` that process
-  is `sbx`, not `claude`. The documented fix is a hint on the host-side command —
-  `HERDR_AGENT=claude sbx run --clone --name <project> claude` — and the maintainers closed a request
+- Each pane carries a state — blocked, working, done, idle — rolled up into a sidebar, with a picker
+  that jumps to whatever is blocked and notifications that work over SSH. On a grid of agents that
+  is the difference between scanning every pane and being told which one wants you. Detection reads
+  the screen, so it is heuristic: an unrecognised prompt reads as idle, not blocked.
+- Agents come back after a restart. When the server restarts — after a reboot, here — it restores
+  the layout and, once a client attaches, resumes each Claude Code and Codex pane with its own resume
+  command (`claude --resume <id>`, `codex resume <id>`). With tmux a reboot means relaunching every
+  agent by hand. It waits for you to attach, so it keeps the posture of launching agent work by hand,
+  and the resumed agents are still in bypass mode because that comes from their config, not a flag.
+- Inside the sandbox it sees `claude` and `codex` as ordinary processes. On the Mac it saw only
+  `sbx`, which needed a `HERDR_AGENT` hint on every command, and the maintainers closed the request
   to look inside sandboxes as working as designed
-  ([herdr#2181](https://github.com/herdrdev/herdr/issues/2181)).
-- Inside the sandbox, where tmux now runs, herdr would see `claude` and `codex` as ordinary
-  processes, so detection needs no hint, and its integration hooks would install into the sandbox's
-  `~/.claude` and `~/.codex` rather than the Mac's. Nobody has tried it there. Its detection is
-  screen-reading either way, which is heuristic: an unrecognised prompt reads as idle, not blocked.
-- Session restore relaunches an agent with its own resume command. On the Mac that would run outside
-  the sandbox, so set `[session] resume_agents_on_restore = false` in `~/.config/herdr/config.toml`
-  there. Inside the sandbox it is harmless.
-- It fetches detection-manifest updates from herdr.dev. `[update] manifest_check = false` turns it
-  off; either way, decide rather than discover it.
+  ([herdr#2181](https://github.com/herdrdev/herdr/issues/2181)). That objection is gone, and its
+  integration hooks would install into the sandbox's `~/.claude` and `~/.codex`, not the Mac's.
 
-Why it is not the default yet. Survival is the requirement the whole grid exists for, and here it is
-documented but unproven on this exact shape: an open bug,
-[herdr#4920](https://github.com/herdrdev/herdr/issues/4920), has the server shut down — taking every
-pane with it — when the macOS terminal app that started it quits, and nobody has checked whether a
-server started from an SSH login outlives that login. Upgrading is also costlier than tmux: the old
-server keeps running until `herdr server stop`, which kills the panes, and the live handoff that
-avoids that is experimental and unavailable to brew installs. On a 0.x tool releasing this often,
-that is a real cost on the always-on path.
+Two objections from the earlier evaluation no longer apply:
+
+- The server-lifetime bug, [herdr#4920](https://github.com/herdrdev/herdr/issues/4920), is still open
+  and now reads "Server shuts down ~1s after last client detaches, killing all pane processes". But a
+  commenter traced the signal to macOS: `loginwindow` force-quits everything a terminal app started
+  when that app quits, even a server that has properly detached. Nothing like that runs inside a
+  Linux sandbox.
+- Upgrading stops the server, which kills the panes. In a kit that installs herdr at create and
+  updates it at sandbox start, as it does the agents, that happens when no panes exist.
+
+What still stands against making it the default:
+
+- Stability on the one requirement the grid exists for. 0.9.0 shipped a Linux server crash that
+  killed every pane ([herdr#4174](https://github.com/herdrdev/herdr/issues/4174), fixed in 0.9.1),
+  and restore after a restart has had bugs since
+  ([herdr#5104](https://github.com/herdrdev/herdr/issues/5104), with zsh, which the sandbox does not
+  use). A 0.x tool with over 300 open issues and pull requests, releasing weekly, against tmux,
+  which does not change.
+- Whether its server outlives the `sbx exec` session that started it is the same open question tmux
+  has, and nobody has tried it.
+- Its remote-machines feature — a herdr client on your laptop showing several servers' agents in one
+  window — needs an SSH target that lands inside the sandbox, and this design reaches the sandbox
+  through `sbx exec` on the Mac. Not a path this cookbook has.
+- It fetches detection-manifest updates from herdr.dev. `[update] manifest_check = false` turns that
+  off; decide rather than discover it.
 
 The options, then:
 
-- Instead of tmux. The right end state if it proves out — it fails none of the three requirements,
-  which nothing else in the table manages, and the state sidebar is a real gain. Not before the
-  survival test below passes.
-- Inside tmux. Supported, and tmux keeps owning survival while herdr adds the sidebar. The cost is
-  two prefix layers that both default to `ctrl+b`, so one has to move, and more to drive from a
-  phone. A reasonable way to trial it. The reverse, tmux inside herdr, is pointless: herdr then sees
-  `tmux` as the pane process and loses detection.
+- Instead of tmux. The right end state if it proves out: the state sidebar and resume after reboot
+  are real gains, and nothing else in the table passes all three columns. Not before the test below.
+- Inside tmux. tmux keeps owning survival while herdr adds the sidebar, at the cost of two prefix
+  layers that both default to `ctrl+b`. A reasonable way to trial it. The reverse, tmux inside
+  herdr, is pointless: herdr then sees `tmux` as the pane process and loses detection.
 - tmux only. What `have-coordination` installs today, and nothing above makes it wrong.
 
-The test that decides it, on a real server, now inside the sandbox: install herdr there, start it
-from `sbx exec -it agents bash`, run `claude` in a pane, drop the SSH connection without detaching,
-reconnect, and confirm the agent is still running and its state is right. Then repeat from a phone
-with Codex, since scrollback over SSH is what ruled out Zellij. If that passes, swapping tmux for
-herdr in `have-coordination` is the next change, with the config above pinned. The macOS server
-lifetime bug above does not apply inside a Linux sandbox; whether herdr's server survives the
-`sbx exec` session ending is the same open question tmux has.
+The test that decides it, on a real server: install herdr inside the sandbox
+(`curl -fsSL https://herdr.dev/install.sh | sh`, the documented installer), start it from
+`sbx exec -it agents bash`, run `claude` in a pane, drop the SSH connection without detaching,
+reconnect, and confirm the agent is still running and its state is right. Then restart the sandbox,
+attach, and check the agent resumed its conversation in bypass mode. Then repeat from a phone with
+Codex, since scrollback over SSH is what ruled out Zellij. If all three pass, the change is small: an
+install step and a start-time update in the kit, and the `agents` command running `herdr` instead of
+`tmux new-session -A`.
 
 Deliberately absent: a dispatcher that takes a request from a chat app and routes it to an agent
 unattended. That is the natural next thing to want, and it is the point at which this stops being a
